@@ -1,0 +1,19 @@
+{
+  "name": "playground",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "rsbuild build",
+    "dev": "rsbuild dev",
+    "preview": "rsbuild preview"
+  },
+  "dependencies": {
+    "lit": "^3.2.1",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@rsbuild/core": "^1.2.14",
+    "typescript": "^5.8.2"
+  }
+}
