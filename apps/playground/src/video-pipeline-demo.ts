@@ -17,6 +17,7 @@ import {
   Observable,
   of,
   reduce,
+  scan,
   share,
   Subject,
   type Subscription,
@@ -156,8 +157,7 @@ export class VideoPipelineDemo extends LitElement {
                 s.cuesNode
                   ? Number.NaN
                   : s.dataOffset +
-                    (s.seekEntries.find((e) => e.seekId === SEEK_ID_KAX_CUES)
-                      ?.seekPosition ?? Number.NaN)
+                    (s.findSeekPositionBySeekId(SEEK_ID_KAX_CUES) ?? Number.NaN)
               ),
               filter((cuesStartOffset) => cuesStartOffset >= 0),
               switchMap((cuesStartOffset) =>
@@ -172,7 +172,8 @@ export class VideoPipelineDemo extends LitElement {
               map(([cues, withMeta]) => {
                 withMeta.cuesNode = cues;
                 return withMeta;
-              })
+              }),
+              share()
             );
 
             const withLocalCues$ = withMeta$.pipe(filter((s) => !!s.cuesNode));
@@ -191,7 +192,22 @@ export class VideoPipelineDemo extends LitElement {
               if (seekTime === 0) {
                 return cluster$;
               }
-              return cluster$.pipe(filter((c) => c.timestamp >= seekTime));
+
+              return cluster$.pipe(
+                scan(
+                  (prev, curr) =>
+                    [prev?.[1], curr] as [
+                      EbmlCluster | undefined,
+                      EbmlCluster | undefined,
+                    ],
+                  [undefined, undefined] as [
+                    EbmlCluster | undefined,
+                    EbmlCluster | undefined,
+                  ]
+                ),
+                filter((c) => c[1]?.timestamp! >= seekTime),
+                map((c) => c[1]!)
+              );
             };
 
             const seekWithCues = (

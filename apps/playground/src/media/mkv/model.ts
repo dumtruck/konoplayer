@@ -60,9 +60,14 @@ export class EbmlSegment {
       .filter((c): c is EbmlSeekEntry => !!c);
   }
 
+  findSeekPositionBySeekId(seekId: Uint8Array): number | undefined {
+    return this.seekEntries.find((c) => isEqual(c.seekId, seekId))
+      ?.seekPosition;
+  }
+
   findLocalNodeBySeekId(seekId: Uint8Array): EbmlTagType | undefined {
     return this.findLocalNodeBySeekPosition(
-      this.seekEntries.find((c) => isEqual(c.seekId, seekId))?.seekPosition
+      this.findSeekPositionBySeekId(seekId)
     );
   }
 
