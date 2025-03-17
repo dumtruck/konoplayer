@@ -1,4 +1,4 @@
 import './index.css';
-import { MyElement } from './my-element';
+import { VideoPipelineDemo } from './video-pipeline-demo';
 
-customElements.define('my-element', MyElement);
+customElements.define('video-pipeline-demo', VideoPipelineDemo);

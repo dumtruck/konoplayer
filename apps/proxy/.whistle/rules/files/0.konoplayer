@@ -1,0 +1,10 @@
+```x-forwarded.json
+{
+  "X-Forwarded-Host": "konoplayer.com",
+  "X-Forwarded-Proto": "https"
+}
+```
+
+^https://konoplayer.com/api*** reqHeaders://{x-forwarded.json} http://127.0.0.1:5001/api$1
+^https://konoplayer.com/*** reqHeaders://{x-forwarded.json} http://127.0.0.1:5000/$1 excludeFilter://^https://konoplayer.com/api
+^wss://konoplayer.com/*** reqHeaders://{x-forwarded.json} ws://127.0.0.1:5000/$1 excludeFilter://^wss://konoplayer.com/api

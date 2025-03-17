@@ -3,4 +3,6 @@ packages:
   - apps/*
 onlyBuiltDependencies:
   - '@biomejs/biome'
+  - '@nestjs/core'
+  - core-js
   - esbuild

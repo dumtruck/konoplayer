@@ -5,4 +5,4 @@ dev-playground:
     pnpm run --filter=playground dev
 
 dev-proxy:
-    pnpm run --filter=proxy dev
+    pnpm run --filter proxy --filter mock dev

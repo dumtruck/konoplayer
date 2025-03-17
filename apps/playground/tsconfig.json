@@ -1,8 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": true,
     "target": "ES2020",
-    "noEmit": true,
+    "outDir": "./dist",
     "experimentalDecorators": true,
     "module": "ESNext",
     "moduleResolution": "bundler",

@@ -16,5 +16,11 @@
     "tsx": "^4.19.2",
     "typescript": "^5.8.2",
     "ultracite": "^4.1.15"
+  },
+  "dependencies": {
+    "@types/lodash-es": "^4.17.12",
+    "lodash-es": "^4.17.21",
+    "mnemonist": "^0.40.3",
+    "rxjs": "^7.8.2"
   }
 }
