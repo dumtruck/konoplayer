@@ -205,8 +205,8 @@ export class VideoPipelineDemo extends LitElement {
                     EbmlCluster | undefined,
                   ]
                 ),
-                filter((c) => c[1]?.timestamp! >= seekTime),
-                map((c) => c[1]!)
+                filter((c) => c[1]?.timestamp! > seekTime),
+                map((c) => c[0] ?? c[1]!)
               );
             };
 
