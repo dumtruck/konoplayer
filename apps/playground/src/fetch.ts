@@ -1,11 +1,11 @@
-export interface RangedVideoStream {
+export interface RangedStream {
   controller: AbortController;
   response: Response;
-  stream: ReadableStream;
+  body: ReadableStream;
   totalSize?: number;
 }
 
-export async function createRangedVideoStream(
+export async function createRangedStream(
   url: string,
   byteStart = 0,
   byteEnd?: number
@@ -53,7 +53,7 @@ export async function createRangedVideoStream(
   return {
     controller,
     response,
-    stream: body,
+    body,
     totalSize,
   };
 }

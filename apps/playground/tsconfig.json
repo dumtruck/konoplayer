@@ -7,7 +7,12 @@
     "experimentalDecorators": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
   },
   "include": [
     "src"

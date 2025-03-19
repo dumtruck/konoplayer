@@ -11,6 +11,9 @@ importers:
       '@types/lodash-es':
         specifier: ^4.17.12
         version: 4.17.12
+      arktype:
+        specifier: ^2.1.10
+        version: 2.1.10
       lodash-es:
         specifier: ^4.17.21
         version: 4.17.21
@@ -20,6 +23,9 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+      type-fest:
+        specifier: ^4.37.0
+        version: 4.37.0
     devDependencies:
       '@biomejs/biome':
         specifier: 1.9.4
@@ -74,8 +80,8 @@ importers:
   apps/playground:
     dependencies:
       konoebml:
-        specifier: 0.1.0-rc.6
-        version: 0.1.0-rc.6
+        specifier: 0.1.0-rc.8
+        version: 0.1.0-rc.8
       lit:
         specifier: ^3.2.1
         version: 3.2.1
@@ -128,6 +134,12 @@ packages:
   '@angular-devkit/schematics@19.2.0':
     resolution: {integrity: sha512-cGGqUGqBXIGJkeL65l70y0BflDAu/0Zi/ohbYat3hvadFfumRJnVElVfJ59JtWO7FfKQjxcwCVTyuQ/tevX/9A==}
     engines: {node: ^18.19.1 || ^20.11.1 || >=22.0.0, npm: ^6.11.0 || ^7.5.6 || >=8.0.0, yarn: '>= 1.13.0'}
+
+  '@ark/schema@0.45.0':
+    resolution: {integrity: sha512-3XlMWkZbEjh0YsF92vnnRNCWNRNhRKDTf6XhugyCXH0YRFuM+w1vFLDbB2JLfZloEd7i5cbqsLaDLzyBZbPrSg==}
+
+  '@ark/util@0.45.0':
+    resolution: {integrity: sha512-Z1gHEGbpPzLtPmYb932t2B++6YonlUi1Fa14IQ4vhsGMWhd81Mi1miUmdZXW4fNI/wg1saT7H2/5cAuONgTXhg==}
 
   '@babel/code-frame@7.26.2':
     resolution: {integrity: sha512-RJlIHRueQgwWitWgF8OdFYGZX328Ax5BCemNGlqHfplnRT9ESi8JkFlvaVYbS+UubVY6dpv87Fs2u5M29iNFVQ==}
@@ -1095,6 +1107,9 @@ packages:
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
 
+  arktype@2.1.10:
+    resolution: {integrity: sha512-KqbrzI9qIGrQUClifyS1HpUp/oTSRtGDvnMKzwg2TAvxRpynY1mn/ubXaxAAdGPOM8V3pBqwb01Z6TcXqhBxzQ==}
+
   array-flatten@1.1.1:
     resolution: {integrity: sha512-PCVAQswWemu6UdxsDFFX/+gVeYqKAod3D3UVm91jHwynguOwAvYPhx8nNlM++NqRcK6CxxpUafjmhIdKiHibqg==}
 
@@ -1838,8 +1853,8 @@ packages:
     resolution: {integrity: sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw==}
     engines: {node: '>=0.10.0'}
 
-  konoebml@0.1.0-rc.6:
-    resolution: {integrity: sha512-PM81HV0OVG0eGo+195azreUtp08FO9vLLrIvrUHbsSQHL/wq7TySU/6AaLm31e3ABKsJ65gpsQr6lcJ5xd8y3Q==}
+  konoebml@0.1.0-rc.8:
+    resolution: {integrity: sha512-fR4DZqCskLKxGBMc58gpOOzajFrfu9hQC7WZd8yGiIxLVhDkzBnihXqlsWJU6Qw77ukMOGGkbeM2uqQyv5dO3w==}
     engines: {node: '>= 18.0.0'}
 
   lines-and-columns@1.2.4:
@@ -2750,6 +2765,12 @@ snapshots:
     transitivePeerDependencies:
       - chokidar
 
+  '@ark/schema@0.45.0':
+    dependencies:
+      '@ark/util': 0.45.0
+
+  '@ark/util@0.45.0': {}
+
   '@babel/code-frame@7.26.2':
     dependencies:
       '@babel/helper-validator-identifier': 7.25.9
@@ -3628,6 +3649,11 @@ snapshots:
 
   argparse@2.0.1: {}
 
+  arktype@2.1.10:
+    dependencies:
+      '@ark/schema': 0.45.0
+      '@ark/util': 0.45.0
+
   array-flatten@1.1.1: {}
 
   array-timsort@1.0.3: {}
@@ -4436,7 +4462,7 @@ snapshots:
 
   kind-of@6.0.3: {}
 
-  konoebml@0.1.0-rc.6:
+  konoebml@0.1.0-rc.8:
     dependencies:
       mnemonist: 0.40.3
       type-fest: 4.37.0

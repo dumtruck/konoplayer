@@ -8,10 +8,11 @@ import {
   type EbmlCuesTagType,
   type EbmlSeekHeadTagType,
   type EbmlSegmentTagType,
-  type EbmlClusterTagType,
 } from 'konoebml';
-import { isTagEnd } from './util';
+import { isTagIdPos, simpleMasterExtractor } from './util';
 import { isEqual } from 'lodash-es';
+import { type } from 'arktype';
+import { TagWithArktype } from './util';
 
 export const SEEK_ID_KAX_INFO = new Uint8Array([0x15, 0x49, 0xa9, 0x66]);
 export const SEEK_ID_KAX_TRACKS = new Uint8Array([0x16, 0x54, 0xae, 0x6b]);
@@ -40,8 +41,7 @@ export class EbmlSegment {
   private addSeekHead(node: EbmlSeekHeadTagType) {
     this.seekHeadNode = node;
     this.seekEntries = this.seekHeadNode.children
-      .filter(isTagEnd)
-      .filter((c) => c.id === EbmlTagIdEnum.Seek)
+      .filter(isTagIdPos(EbmlTagIdEnum.Seek, EbmlTagPosition.End))
       .map((c) => {
         const seekId = c.children.find(
           (item) => item.id === EbmlTagIdEnum.SeekID
@@ -74,7 +74,7 @@ export class EbmlSegment {
   findLocalNodeBySeekPosition(
     seekPosition: number | undefined
   ): EbmlTagType | undefined {
-    return Number.isSafeInteger(seekPosition)
+    return seekPosition! >= 0
       ? this.metaOffsets.get(seekPosition as number)
       : undefined;
   }
@@ -104,6 +104,45 @@ export class EbmlSegment {
   }
 }
 
+export class TrackEntry extends TagWithArktype({
+  id: EbmlTagIdEnum.TrackEntry,
+  schema: type({
+    trackNumber: 'number',
+    trackType: 'number',
+    trackUID: 'number',
+  }),
+  extract: simpleMasterExtractor({
+    [EbmlTagIdEnum.TrackNumber]: {
+      key: 'trackNumber',
+      extract: (t) => t.data as number,
+    },
+    [EbmlTagIdEnum.TrackType]: {
+      key: 'trackType',
+      extract: (t) => t.data as number,
+    },
+    [EbmlTagIdEnum.TrackUID]: {
+      key: 'trackUID',
+      extract: (t) => t.data as number,
+    },
+  }),
+}) {}
+
+const TracksSchema = type({
+  tracks: type.instanceOf(TrackEntry).array(),
+});
+
+export class Tracks extends TagWithArktype({
+  id: EbmlTagIdEnum.Tracks,
+  schema: TracksSchema,
+  extract: simpleMasterExtractor({
+    [EbmlTagIdEnum.TrackEntry]: {
+      key: 'tracks',
+      multi: true,
+      extract: TrackEntry.fromTag.bind(TrackEntry),
+    },
+  }),
+}) {}
+
 export interface EbmlSeekEntry {
   seekId: Uint8Array;
   seekPosition: number;
@@ -117,33 +156,59 @@ export class EbmlHead {
   }
 }
 
-export class EbmlCluster {
-  cluster: EbmlClusterTagType;
-  _timestamp: number;
+export class SimpleBlock extends TagWithArktype({
+  id: EbmlTagIdEnum.SimpleBlock,
+  schema: type({
+    frame: type.instanceOf(Uint8Array),
+  }),
+  extract: (tag) => ({
+    frame: tag.payload,
+  }),
+}) {}
 
-  constructor(cluster: EbmlClusterTagType) {
-    this.cluster = cluster;
-    this._timestamp = cluster.children.find(
-      (c) => c.id === EbmlTagIdEnum.Timecode
-    )?.data as number;
-  }
+export class Cluster extends TagWithArktype({
+  id: EbmlTagIdEnum.Cluster,
+  schema: type({
+    timestamp: 'number',
+    position: 'number?',
+    prevSize: 'number?',
+    simpleBlock: type.instanceOf(SimpleBlock).array(),
+  }),
+  extract: simpleMasterExtractor({
+    [EbmlTagIdEnum.Timecode]: {
+      key: 'timestamp',
+      extract: (t) => t.data as number,
+    },
+    [EbmlTagIdEnum.PrevSize]: {
+      key: 'prevSize',
+      extract: (t) => t.data as number,
+    },
+    [EbmlTagIdEnum.SimpleBlock]: {
+      key: 'simpleBlock',
+      multi: true,
+      extract: SimpleBlock.fromTag.bind(SimpleBlock),
+    },
+  }),
+}) {}
 
-  get timestamp(): number {
-    return this._timestamp;
-  }
+export interface TrackPositions {
+  track: number;
+  clusterPosition: number;
+  relativePosition?: number;
+  duration?: number;
 }
 
-export class EbmlCue {
+export class CuePoint {
   node: EbmlCuePointTagType;
   _timestamp: number;
-  trackPositions: { track: number; position: number }[];
+  trackPositions: TrackPositions[];
 
   get timestamp(): number {
     return this._timestamp;
   }
 
   get position(): number {
-    return Math.max(...this.trackPositions.map((t) => t.position));
+    return Math.max(...this.trackPositions.map((t) => t.clusterPosition));
   }
 
   constructor(node: EbmlCuePointTagType) {
@@ -151,38 +216,64 @@ export class EbmlCue {
     this._timestamp = node.children.find((c) => c.id === EbmlTagIdEnum.CueTime)
       ?.data as number;
     this.trackPositions = node.children
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
       .map((t) => {
         if (
           t.id === EbmlTagIdEnum.CueTrackPositions &&
           t.position === EbmlTagPosition.End
         ) {
-          const track = t.children.find((t) => t.id === EbmlTagIdEnum.CueTrack)
-            ?.data as number;
-          const position = t.children.find(
-            (t) => t.id === EbmlTagIdEnum.CueClusterPosition
-          )?.data as number;
+          let track!: number;
+          let clusterPosition!: number;
+          let relativePosition: number | undefined;
+          let duration: number | undefined;
 
-          return track! >= 0 && position! >= 0 ? { track, position } : null;
+          for (const c of t.children) {
+            if (c.id === EbmlTagIdEnum.CueTrack) {
+              track = c.data as number;
+            }
+            if (c.id === EbmlTagIdEnum.CueClusterPosition) {
+              clusterPosition = c.data as number;
+            }
+            if (c.id === EbmlTagIdEnum.CueRelativePosition) {
+              relativePosition = c.data as number;
+            }
+            if (c.id === EbmlTagIdEnum.CueDuration) {
+              duration = c.data as number;
+            }
+          }
+
+          if (track! >= 0 && clusterPosition! >= 0) {
+            return {
+              track: track!,
+              clusterPosition: clusterPosition!,
+              relativePosition,
+              duration,
+            } as TrackPositions;
+          }
+          throw new Error(
+            `Tracking positions missing track of cluster position at ${t.startOffset}`
+          );
         }
         return null;
       })
-      .filter((a): a is { track: number; position: number } => !!a);
+      .filter((a): a is TrackPositions => !!a);
   }
 }
 
-export class EbmlCues {
-  node: EbmlCuesTagType;
-  cues: EbmlCue[];
-
-  constructor(node: EbmlCuesTagType) {
-    this.node = node;
-    this.cues = node.children
-      .filter(isTagEnd)
-      .filter((c) => c.id === EbmlTagIdEnum.CuePoint)
-      .map((c) => new EbmlCue(c));
-  }
-
-  findClosestCue(seekTime: number): EbmlCue | null {
+export class Cues extends TagWithArktype({
+  id: EbmlTagIdEnum.Cues,
+  schema: type({
+    cues: type.instanceOf(CuePoint).array(),
+  }),
+  extract: simpleMasterExtractor({
+    [EbmlTagIdEnum.CuePoint]: {
+      key: 'cues',
+      multi: true,
+      extract: (t) => new CuePoint(t),
+    },
+  }),
+}) {
+  findClosestCue(seekTime: number): CuePoint | null {
     const cues = this.cues;
     if (!cues || cues.length === 0) {
       return null;
