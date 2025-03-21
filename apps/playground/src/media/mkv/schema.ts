@@ -1,5 +1,5 @@
 import { type, match } from 'arktype';
-import { EbmlTagIdEnum, EbmlSimpleBlockTag, EbmlBlockTag } from 'konoebml';
+import { EbmlTagIdEnum, EbmlSimpleBlockTag ,EbmlBlockTag } from 'konoebml';
 
 export const BinarySchema = type.instanceOf(Uint8Array);
 export const SimpleBlockSchema = type.instanceOf(EbmlSimpleBlockTag);
@@ -33,7 +33,7 @@ export const SeekSchema = type({
 export type SeekType = typeof SeekSchema.infer;
 
 export const SeekHeadSchema = type({
-  Seek: SeekSchema.array(),
+  Seek: SeekSchema.array().atLeastLength(1),
 });
 
 export type SeekHeadType = typeof SeekHeadSchema.infer;
@@ -79,7 +79,7 @@ export const BlockMoreSchema = type({
 export type BlockMoreType = typeof BlockMoreSchema.infer;
 
 export const BlockAdditionsSchema = type({
-  BlockMore: BlockMoreSchema.array(),
+  BlockMore: BlockMoreSchema.array().atLeastLength(1),
 });
 
 export type BlockAdditionsType = typeof BlockAdditionsSchema.infer;
@@ -198,12 +198,9 @@ export enum MatrixCoefficientsRestrictionEnum {
   CHROMA_DERIVED_CONSTANT_LUMINANCE = 13,
   // ITU-R BT.2100-0
   ITU_R_BT_2100_0 = 14,
-}
-export const MatrixCoefficientsRestriction = type(
-  '0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14'
-);
-export type MatrixCoefficientsRestrictionType =
-  typeof MatrixCoefficientsRestriction.infer;
+};
+export const MatrixCoefficientsRestriction = type('0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14');
+export type MatrixCoefficientsRestrictionType = typeof MatrixCoefficientsRestriction.infer;
 
 export enum ChromaSitingHorzRestrictionEnum {
   // unspecified
@@ -212,10 +209,9 @@ export enum ChromaSitingHorzRestrictionEnum {
   LEFT_COLLOCATED = 1,
   // half
   HALF = 2,
-}
+};
 export const ChromaSitingHorzRestriction = type('0 | 1 | 2');
-export type ChromaSitingHorzRestrictionType =
-  typeof ChromaSitingHorzRestriction.infer;
+export type ChromaSitingHorzRestrictionType = typeof ChromaSitingHorzRestriction.infer;
 
 export enum ChromaSitingVertRestrictionEnum {
   // unspecified
@@ -224,10 +220,9 @@ export enum ChromaSitingVertRestrictionEnum {
   TOP_COLLOCATED = 1,
   // half
   HALF = 2,
-}
+};
 export const ChromaSitingVertRestriction = type('0 | 1 | 2');
-export type ChromaSitingVertRestrictionType =
-  typeof ChromaSitingVertRestriction.infer;
+export type ChromaSitingVertRestrictionType = typeof ChromaSitingVertRestriction.infer;
 
 export enum RangeRestrictionEnum {
   // unspecified
@@ -238,7 +233,7 @@ export enum RangeRestrictionEnum {
   FULL_RANGE_NO_CLIPPING = 2,
   // defined by MatrixCoefficients / TransferCharacteristics
   DEFINED_BY_MATRIX_COEFFICIENTS_TRANSFER_CHARACTERISTICS = 3,
-}
+};
 export const RangeRestriction = type('0 | 1 | 2 | 3');
 export type RangeRestrictionType = typeof RangeRestriction.infer;
 
@@ -281,12 +276,9 @@ export enum TransferCharacteristicsRestrictionEnum {
   SMPTE_ST_428_1 = 17,
   // ARIB STD-B67 (HLG)
   ARIB_STD_B67_HLG = 18,
-}
-export const TransferCharacteristicsRestriction = type(
-  '0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18'
-);
-export type TransferCharacteristicsRestrictionType =
-  typeof TransferCharacteristicsRestriction.infer;
+};
+export const TransferCharacteristicsRestriction = type('0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18');
+export type TransferCharacteristicsRestrictionType = typeof TransferCharacteristicsRestriction.infer;
 
 export enum PrimariesRestrictionEnum {
   // reserved
@@ -317,10 +309,8 @@ export enum PrimariesRestrictionEnum {
   SMPTE_EG_432_2 = 12,
   // EBU Tech. 3213-E - JEDEC P22 phosphors
   EBU_TECH_3213_E_JEDEC_P22_PHOSPHORS = 22,
-}
-export const PrimariesRestriction = type(
-  '0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 22'
-);
+};
+export const PrimariesRestriction = type('0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 22');
 export type PrimariesRestrictionType = typeof PrimariesRestriction.infer;
 
 export const ColourSchema = type({
@@ -351,10 +341,9 @@ export enum ProjectionTypeRestrictionEnum {
   CUBEMAP = 2,
   // mesh
   MESH = 3,
-}
+};
 export const ProjectionTypeRestriction = type('0 | 1 | 2 | 3');
-export type ProjectionTypeRestrictionType =
-  typeof ProjectionTypeRestriction.infer;
+export type ProjectionTypeRestrictionType = typeof ProjectionTypeRestriction.infer;
 
 export const ProjectionSchema = type({
   ProjectionType: ProjectionTypeRestriction.default(0),
@@ -373,10 +362,9 @@ export enum FlagInterlacedRestrictionEnum {
   INTERLACED = 1,
   // progressive
   PROGRESSIVE = 2,
-}
+};
 export const FlagInterlacedRestriction = type('0 | 1 | 2');
-export type FlagInterlacedRestrictionType =
-  typeof FlagInterlacedRestriction.infer;
+export type FlagInterlacedRestrictionType = typeof FlagInterlacedRestriction.infer;
 
 export enum FieldOrderRestrictionEnum {
   // progressive
@@ -391,7 +379,7 @@ export enum FieldOrderRestrictionEnum {
   TFF_INTERLEAVED = 9,
   // bff (interleaved)
   BFF_INTERLEAVED = 14,
-}
+};
 export const FieldOrderRestriction = type('0 | 1 | 2 | 6 | 9 | 14');
 export type FieldOrderRestrictionType = typeof FieldOrderRestriction.infer;
 
@@ -426,10 +414,8 @@ export enum StereoModeRestrictionEnum {
   BOTH_EYES_LACED_IN_ONE_BLOCK_LEFT_EYE_IS_FIRST = 13,
   // both eyes laced in one Block (right eye is first)
   BOTH_EYES_LACED_IN_ONE_BLOCK_RIGHT_EYE_IS_FIRST = 14,
-}
-export const StereoModeRestriction = type(
-  '0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14'
-);
+};
+export const StereoModeRestriction = type('0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14');
 export type StereoModeRestrictionType = typeof StereoModeRestriction.infer;
 
 export enum AlphaModeRestrictionEnum {
@@ -437,7 +423,7 @@ export enum AlphaModeRestrictionEnum {
   NONE = 0,
   // present
   PRESENT = 1,
-}
+};
 export const AlphaModeRestriction = type('0 | 1');
 export type AlphaModeRestrictionType = typeof AlphaModeRestriction.infer;
 
@@ -450,10 +436,9 @@ export enum OldStereoModeRestrictionEnum {
   LEFT_EYE = 2,
   // both eyes
   BOTH_EYES = 3,
-}
+};
 export const OldStereoModeRestriction = type('0 | 1 | 2 | 3');
-export type OldStereoModeRestrictionType =
-  typeof OldStereoModeRestriction.infer;
+export type OldStereoModeRestrictionType = typeof OldStereoModeRestriction.infer;
 
 export enum DisplayUnitRestrictionEnum {
   // pixels
@@ -466,7 +451,7 @@ export enum DisplayUnitRestrictionEnum {
   DISPLAY_ASPECT_RATIO = 3,
   // unknown
   UNKNOWN = 4,
-}
+};
 export const DisplayUnitRestriction = type('0 | 1 | 2 | 3 | 4');
 export type DisplayUnitRestrictionType = typeof DisplayUnitRestriction.infer;
 
@@ -477,10 +462,9 @@ export enum AspectRatioTypeRestrictionEnum {
   KEEP_ASPECT_RATIO = 1,
   // fixed
   FIXED = 2,
-}
+};
 export const AspectRatioTypeRestriction = type('0 | 1 | 2');
-export type AspectRatioTypeRestrictionType =
-  typeof AspectRatioTypeRestriction.infer;
+export type AspectRatioTypeRestrictionType = typeof AspectRatioTypeRestriction.infer;
 
 export const VideoSchema = type({
   FlagInterlaced: FlagInterlacedRestriction.default(0),
@@ -534,10 +518,8 @@ export enum EmphasisRestrictionEnum {
   PHONO_LONDON = 15,
   // Phono NARTB
   PHONO_NARTB = 16,
-}
-export const EmphasisRestriction = type(
-  '0 | 1 | 2 | 3 | 4 | 5 | 10 | 11 | 12 | 13 | 14 | 15 | 16'
-);
+};
+export const EmphasisRestriction = type('0 | 1 | 2 | 3 | 4 | 5 | 10 | 11 | 12 | 13 | 14 | 15 | 16');
 export type EmphasisRestrictionType = typeof EmphasisRestriction.infer;
 
 export const AudioSchema = type({
@@ -558,10 +540,9 @@ export enum TrackPlaneTypeRestrictionEnum {
   RIGHT_EYE = 1,
   // background
   BACKGROUND = 2,
-}
+};
 export const TrackPlaneTypeRestriction = type('0 | 1 | 2');
-export type TrackPlaneTypeRestrictionType =
-  typeof TrackPlaneTypeRestriction.infer;
+export type TrackPlaneTypeRestrictionType = typeof TrackPlaneTypeRestriction.infer;
 
 export const TrackPlaneSchema = type({
   TrackPlaneUID: type.number,
@@ -571,13 +552,13 @@ export const TrackPlaneSchema = type({
 export type TrackPlaneType = typeof TrackPlaneSchema.infer;
 
 export const TrackCombinePlanesSchema = type({
-  TrackPlane: TrackPlaneSchema.array(),
+  TrackPlane: TrackPlaneSchema.array().atLeastLength(1),
 });
 
 export type TrackCombinePlanesType = typeof TrackCombinePlanesSchema.infer;
 
 export const TrackJoinBlocksSchema = type({
-  TrackJoinUID: type.number.array(),
+  TrackJoinUID: type.number.array().atLeastLength(1),
 });
 
 export type TrackJoinBlocksType = typeof TrackJoinBlocksSchema.infer;
@@ -598,10 +579,9 @@ export enum ContentCompAlgoRestrictionEnum {
   LZO1X = 2,
   // Header Stripping
   HEADER_STRIPPING = 3,
-}
+};
 export const ContentCompAlgoRestriction = type('0 | 1 | 2 | 3');
-export type ContentCompAlgoRestrictionType =
-  typeof ContentCompAlgoRestriction.infer;
+export type ContentCompAlgoRestrictionType = typeof ContentCompAlgoRestriction.infer;
 
 export const ContentCompressionSchema = type({
   ContentCompAlgo: ContentCompAlgoRestriction.default(0),
@@ -615,17 +595,15 @@ export enum AESSettingsCipherModeRestrictionEnum {
   AES_CTR = 1,
   // AES-CBC
   AES_CBC = 2,
-}
+};
 export const AESSettingsCipherModeRestriction = type('1 | 2');
-export type AESSettingsCipherModeRestrictionType =
-  typeof AESSettingsCipherModeRestriction.infer;
+export type AESSettingsCipherModeRestrictionType = typeof AESSettingsCipherModeRestriction.infer;
 
 export const ContentEncAESSettingsSchema = type({
   AESSettingsCipherMode: AESSettingsCipherModeRestriction,
 });
 
-export type ContentEncAESSettingsType =
-  typeof ContentEncAESSettingsSchema.infer;
+export type ContentEncAESSettingsType = typeof ContentEncAESSettingsSchema.infer;
 
 export enum ContentEncAlgoRestrictionEnum {
   // Not encrypted
@@ -640,20 +618,18 @@ export enum ContentEncAlgoRestrictionEnum {
   BLOWFISH = 4,
   // AES
   AES = 5,
-}
+};
 export const ContentEncAlgoRestriction = type('0 | 1 | 2 | 3 | 4 | 5');
-export type ContentEncAlgoRestrictionType =
-  typeof ContentEncAlgoRestriction.infer;
+export type ContentEncAlgoRestrictionType = typeof ContentEncAlgoRestriction.infer;
 
 export enum ContentSigAlgoRestrictionEnum {
   // Not signed
   NOT_SIGNED = 0,
   // RSA
   RSA = 1,
-}
+};
 export const ContentSigAlgoRestriction = type('0 | 1');
-export type ContentSigAlgoRestrictionType =
-  typeof ContentSigAlgoRestriction.infer;
+export type ContentSigAlgoRestrictionType = typeof ContentSigAlgoRestriction.infer;
 
 export enum ContentSigHashAlgoRestrictionEnum {
   // Not signed
@@ -662,10 +638,9 @@ export enum ContentSigHashAlgoRestrictionEnum {
   SHA1_160 = 1,
   // MD5
   MD5 = 2,
-}
+};
 export const ContentSigHashAlgoRestriction = type('0 | 1 | 2');
-export type ContentSigHashAlgoRestrictionType =
-  typeof ContentSigHashAlgoRestriction.infer;
+export type ContentSigHashAlgoRestrictionType = typeof ContentSigHashAlgoRestriction.infer;
 
 export const ContentEncryptionSchema = type({
   ContentEncAlgo: ContentEncAlgoRestriction.default(0),
@@ -686,20 +661,18 @@ export enum ContentEncodingScopeRestrictionEnum {
   PRIVATE = 2,
   // Next
   NEXT = 4,
-}
+};
 export const ContentEncodingScopeRestriction = type('1 | 2 | 4');
-export type ContentEncodingScopeRestrictionType =
-  typeof ContentEncodingScopeRestriction.infer;
+export type ContentEncodingScopeRestrictionType = typeof ContentEncodingScopeRestriction.infer;
 
 export enum ContentEncodingTypeRestrictionEnum {
   // Compression
   COMPRESSION = 0,
   // Encryption
   ENCRYPTION = 1,
-}
+};
 export const ContentEncodingTypeRestriction = type('0 | 1');
-export type ContentEncodingTypeRestrictionType =
-  typeof ContentEncodingTypeRestriction.infer;
+export type ContentEncodingTypeRestrictionType = typeof ContentEncodingTypeRestriction.infer;
 
 export const ContentEncodingSchema = type({
   ContentEncodingOrder: type.number.default(0),
@@ -712,7 +685,7 @@ export const ContentEncodingSchema = type({
 export type ContentEncodingType = typeof ContentEncodingSchema.infer;
 
 export const ContentEncodingsSchema = type({
-  ContentEncoding: ContentEncodingSchema.array(),
+  ContentEncoding: ContentEncodingSchema.array().atLeastLength(1),
 });
 
 export type ContentEncodingsType = typeof ContentEncodingsSchema.infer;
@@ -734,7 +707,7 @@ export enum TrackTypeRestrictionEnum {
   CONTROL = 32,
   // metadata
   METADATA = 33,
-}
+};
 export const TrackTypeRestriction = type('1 | 2 | 3 | 16 | 17 | 18 | 32 | 33');
 export type TrackTypeRestrictionType = typeof TrackTypeRestriction.infer;
 
@@ -760,7 +733,7 @@ export const TrackEntrySchema = type({
   MaxBlockAdditionID: type.number.default(0),
   BlockAdditionMapping: BlockAdditionMappingSchema.array().optional(),
   Name: type.string.optional(),
-  Language: type.string.default('eng'),
+  Language: type.string.default("eng"),
   LanguageBCP47: type.string.optional(),
   CodecID: type.string,
   CodecPrivate: BinarySchema.optional(),
@@ -788,7 +761,7 @@ export const TrackEntrySchema = type({
 export type TrackEntryType = typeof TrackEntrySchema.infer;
 
 export const TracksSchema = type({
-  TrackEntry: TrackEntrySchema.array(),
+  TrackEntry: TrackEntrySchema.array().atLeastLength(1),
 });
 
 export type TracksType = typeof TracksSchema.infer;
@@ -816,13 +789,13 @@ export type CueTrackPositionsType = typeof CueTrackPositionsSchema.infer;
 
 export const CuePointSchema = type({
   CueTime: type.number,
-  CueTrackPositions: CueTrackPositionsSchema.array(),
+  CueTrackPositions: CueTrackPositionsSchema.array().atLeastLength(1),
 });
 
 export type CuePointType = typeof CuePointSchema.infer;
 
 export const CuesSchema = type({
-  CuePoint: CuePointSchema.array(),
+  CuePoint: CuePointSchema.array().atLeastLength(1),
 });
 
 export type CuesType = typeof CuesSchema.infer;
@@ -841,7 +814,7 @@ export const AttachedFileSchema = type({
 export type AttachedFileType = typeof AttachedFileSchema.infer;
 
 export const AttachmentsSchema = type({
-  AttachedFile: AttachedFileSchema.array(),
+  AttachedFile: AttachedFileSchema.array().atLeastLength(1),
 });
 
 export type AttachmentsType = typeof AttachmentsSchema.infer;
@@ -859,38 +832,39 @@ export const EditionEntrySchema = type({
   EditionFlagDefault: type.number.default(0),
   EditionFlagOrdered: type.number.default(0),
   EditionDisplay: EditionDisplaySchema.array().optional(),
+
 });
 
 export type EditionEntryType = typeof EditionEntrySchema.infer;
 
 export const ChaptersSchema = type({
-  EditionEntry: EditionEntrySchema.array(),
+  EditionEntry: EditionEntrySchema.array().atLeastLength(1),
 });
 
 export type ChaptersType = typeof ChaptersSchema.infer;
 
 export const TagTrackUIDSchema = match({
-  'number[]': (v) => (v.length > 0 ? v : [0]),
-  undefined: () => [0],
-  default: 'assert',
+  "number[]": v => v.length > 0 ? v : [0],
+  "undefined": () => [0],
+  default: "assert"
 });
 
 export const TagEditionUIDSchema = match({
-  'number[]': (v) => (v.length > 0 ? v : [0]),
-  undefined: () => [0],
-  default: 'assert',
+  "number[]": v => v.length > 0 ? v : [0],
+  "undefined": () => [0],
+  default: "assert"
 });
 
 export const TagChapterUIDSchema = match({
-  'number[]': (v) => (v.length > 0 ? v : [0]),
-  undefined: () => [0],
-  default: 'assert',
+  "number[]": v => v.length > 0 ? v : [0],
+  "undefined": () => [0],
+  default: "assert"
 });
 
 export const TagAttachmentUIDSchema = match({
-  'number[]': (v) => (v.length > 0 ? v : [0]),
-  undefined: () => [0],
-  default: 'assert',
+  "number[]": v => v.length > 0 ? v : [0],
+  "undefined": () => [0],
+  default: "assert"
 });
 
 export enum TargetTypeValueRestrictionEnum {
@@ -908,60 +882,55 @@ export enum TargetTypeValueRestrictionEnum {
   EDITION_ISSUE_VOLUME_OPUS_SEASON_SEQUEL = 60,
   // COLLECTION
   COLLECTION = 70,
-}
-export const TargetTypeValueRestriction = type(
-  '10 | 20 | 30 | 40 | 50 | 60 | 70'
-);
-export type TargetTypeValueRestrictionType =
-  typeof TargetTypeValueRestriction.infer;
+};
+export const TargetTypeValueRestriction = type('10 | 20 | 30 | 40 | 50 | 60 | 70');
+export type TargetTypeValueRestrictionType = typeof TargetTypeValueRestriction.infer;
 
 export enum TargetTypeRestrictionEnum {
   // TargetTypeValue 70
-  COLLECTION = 'COLLECTION',
+  COLLECTION = "COLLECTION",
   // TargetTypeValue 60
-  EDITION = 'EDITION',
+  EDITION = "EDITION",
   // TargetTypeValue 60
-  ISSUE = 'ISSUE',
+  ISSUE = "ISSUE",
   // TargetTypeValue 60
-  VOLUME = 'VOLUME',
+  VOLUME = "VOLUME",
   // TargetTypeValue 60
-  OPUS = 'OPUS',
+  OPUS = "OPUS",
   // TargetTypeValue 60
-  SEASON = 'SEASON',
+  SEASON = "SEASON",
   // TargetTypeValue 60
-  SEQUEL = 'SEQUEL',
+  SEQUEL = "SEQUEL",
   // TargetTypeValue 50
-  ALBUM = 'ALBUM',
+  ALBUM = "ALBUM",
   // TargetTypeValue 50
-  OPERA = 'OPERA',
+  OPERA = "OPERA",
   // TargetTypeValue 50
-  CONCERT = 'CONCERT',
+  CONCERT = "CONCERT",
   // TargetTypeValue 50
-  MOVIE = 'MOVIE',
+  MOVIE = "MOVIE",
   // TargetTypeValue 50
-  EPISODE = 'EPISODE',
+  EPISODE = "EPISODE",
   // TargetTypeValue 40
-  PART = 'PART',
+  PART = "PART",
   // TargetTypeValue 40
-  SESSION = 'SESSION',
+  SESSION = "SESSION",
   // TargetTypeValue 30
-  TRACK = 'TRACK',
+  TRACK = "TRACK",
   // TargetTypeValue 30
-  SONG = 'SONG',
+  SONG = "SONG",
   // TargetTypeValue 30
-  CHAPTER = 'CHAPTER',
+  CHAPTER = "CHAPTER",
   // TargetTypeValue 20
-  SUBTRACK = 'SUBTRACK',
+  SUBTRACK = "SUBTRACK",
   // TargetTypeValue 20
-  MOVEMENT = 'MOVEMENT',
+  MOVEMENT = "MOVEMENT",
   // TargetTypeValue 20
-  SCENE = 'SCENE',
+  SCENE = "SCENE",
   // TargetTypeValue 10
-  SHOT = 'SHOT',
-}
-export const TargetTypeRestriction = type(
-  '"COLLECTION" | "EDITION" | "ISSUE" | "VOLUME" | "OPUS" | "SEASON" | "SEQUEL" | "ALBUM" | "OPERA" | "CONCERT" | "MOVIE" | "EPISODE" | "PART" | "SESSION" | "TRACK" | "SONG" | "CHAPTER" | "SUBTRACK" | "MOVEMENT" | "SCENE" | "SHOT"'
-);
+  SHOT = "SHOT",
+};
+export const TargetTypeRestriction = type('"COLLECTION" | "EDITION" | "ISSUE" | "VOLUME" | "OPUS" | "SEASON" | "SEQUEL" | "ALBUM" | "OPERA" | "CONCERT" | "MOVIE" | "EPISODE" | "PART" | "SESSION" | "TRACK" | "SONG" | "CHAPTER" | "SUBTRACK" | "MOVEMENT" | "SCENE" | "SHOT"');
 export type TargetTypeRestrictionType = typeof TargetTypeRestriction.infer;
 
 export const TargetsSchema = type({
@@ -977,12 +946,13 @@ export type TargetsType = typeof TargetsSchema.infer;
 
 export const TagSchema = type({
   Targets: TargetsSchema,
+
 });
 
 export type TagType = typeof TagSchema.infer;
 
 export const TagsSchema = type({
-  Tag: TagSchema.array(),
+  Tag: TagSchema.array().atLeastLength(1),
 });
 
 export type TagsType = typeof TagsSchema.infer;
@@ -1037,5 +1007,5 @@ export const IdMultiSet = new Set([
   EbmlTagIdEnum.Tag,
   EbmlTagIdEnum.SeekHead,
   EbmlTagIdEnum.Cluster,
-  EbmlTagIdEnum.Tags,
-]);
+  EbmlTagIdEnum.Tags
+])

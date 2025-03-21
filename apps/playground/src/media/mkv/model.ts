@@ -1,135 +1,229 @@
 import {
-  type EbmlTagType,
-  EbmlTagIdEnum,
-  EbmlTagPosition,
-  type EbmlTracksTagType,
-  type EbmlInfoTagType,
+  type EbmlClusterTagType,
+  type EbmlCuePointTagType,
   type EbmlCuesTagType,
+  type EbmlInfoTagType,
+  type EbmlMasterTagType,
   type EbmlSeekHeadTagType,
   type EbmlSegmentTagType,
-  type EbmlCuePointTagType,
-  type EbmlMasterTagType,
+  EbmlTagIdEnum,
+  EbmlTagPosition,
+  type EbmlTagType,
+  type EbmlTrackEntryTagType,
+  type EbmlTracksTagType,
 } from 'konoebml';
+import {convertEbmlTagToComponent, type InferType,} from './util';
+import {isEqual, maxBy} from 'lodash-es';
+import {ArkErrors, type Type} from 'arktype';
 import {
-  convertEbmlTagToModelShape,
-  type InferType,
-  isTagIdPos,
-  SEEK_ID_KAX_CUES,
-  SEEK_ID_KAX_INFO,
-  SEEK_ID_KAX_TRACKS,
-} from './util';
-import { isEqual } from 'lodash-es';
-import type { Type } from 'arktype';
-import { CuePointSchema, type CuePointType } from './schema';
+  ClusterSchema,
+  type ClusterType,
+  CuePointSchema,
+  type CuePointType,
+  type CueTrackPositionsType,
+  InfoSchema,
+  type InfoType,
+  SeekHeadSchema,
+  type SeekHeadType,
+  TrackEntrySchema,
+  type TrackEntryType
+} from './schema';
 
-export abstract class StandardComponentSystem<
-  E extends EbmlMasterTagType,
-  S extends Type<any>,
-> {
-  abstract get schema(): S;
+export const SEEK_ID_KAX_INFO = new Uint8Array([0x15, 0x49, 0xa9, 0x66]);
+export const SEEK_ID_KAX_TRACKS = new Uint8Array([0x16, 0x54, 0xae, 0x6b]);
+export const SEEK_ID_KAX_CUES = new Uint8Array([0x1c, 0x53, 0xbb, 0x6b]);
 
-  componentFromTag(tag: E): InferType<S> {
-    const extracted = convertEbmlTagToModelShape(tag);
-    return this.schema.assert(extracted) as InferType<S>;
+export class SegmentSystem {
+  startTag: EbmlSegmentTagType;
+  headTags: EbmlTagType[] = [];
+
+  cue: CueSystem;
+  cluster: ClusterSystem;
+  seek: SeekSystem;
+  info: InfoSystem;
+  track: TrackSystem;
+
+
+  constructor(startNode: EbmlSegmentTagType) {
+    this.startTag = startNode;
+    this.cue = new CueSystem(this);
+    this.cluster = new ClusterSystem(this);
+    this.seek = new SeekSystem(this);
+    this.info = new InfoSystem(this);
+    this.track = new TrackSystem(this);
+  }
+
+  get dataStartOffset() {
+    return this.startTag.startOffset + this.startTag.headerLength;
+  }
+
+  get startOffset () {
+    return this.startTag.startOffset;
+  }
+
+  completeHeads () {
+    const infoTag = this.seek.seekTagBySeekId(SEEK_ID_KAX_INFO);
+    const tracksTag = this.seek.seekTagBySeekId(SEEK_ID_KAX_TRACKS);
+    const cuesTag = this.seek.seekTagBySeekId(SEEK_ID_KAX_CUES);
+
+    if (cuesTag?.id === EbmlTagIdEnum.Cues) {
+      this.cue.prepareCuesWithTag(cuesTag)
+    }
+    if (infoTag?.id === EbmlTagIdEnum.Info) {
+      this.info.prepareWithInfoTag(infoTag);
+    }
+    if (tracksTag?.id === EbmlTagIdEnum.Tracks) {
+      this.track.prepareTracksWithTag(tracksTag);
+    }
+
+    return this;
+  }
+
+  scanHead (tag: EbmlTagType) {
+    if (
+      tag.id === EbmlTagIdEnum.SeekHead &&
+      tag.position === EbmlTagPosition.End
+    ) {
+      this.seek.addSeekHeadTag(tag);
+    }
+    this.headTags.push(tag);
+    this.seek.memoTag(tag);
+    return this;
   }
 }
 
-export class EbmlSegment {
-  startNode: EbmlSegmentTagType;
-  seekHeadNode?: EbmlSeekHeadTagType;
-  seekEntries: EbmlSeekEntry[];
-  tracksNode?: EbmlTracksTagType;
-  infoNode?: EbmlInfoTagType;
-  cuesNode?: EbmlCuesTagType;
-  metaBuffer: EbmlTagType[] = [];
-  metaOffsets: Map<number, EbmlTagType> = new Map();
+export class SegmentComponentSystemTrait<E extends EbmlMasterTagType, S extends Type<any>> {
+  segment: SegmentSystem;
 
-  constructor(startNode: EbmlSegmentTagType) {
-    this.startNode = startNode;
-    this.seekEntries = [];
-    this.metaBuffer = [];
+  get schema(): S {
+    throw new Error("unimplemented!")
   }
 
-  get dataOffset() {
-    return this.startNode.startOffset + this.startNode.headerLength;
+  constructor(segment: SegmentSystem) {
+    this.segment = segment;
   }
 
-  private addSeekHead(node: EbmlSeekHeadTagType) {
-    this.seekHeadNode = node;
-    this.seekEntries = this.seekHeadNode.children
-      .filter(isTagIdPos(EbmlTagIdEnum.Seek, EbmlTagPosition.End))
-      .map((c) => {
-        const seekId = c.children.find(
-          (item) => item.id === EbmlTagIdEnum.SeekID
-        )?.data;
-        const seekPosition = c.children.find(
-          (item) => item.id === EbmlTagIdEnum.SeekPosition
-        )?.data as number;
-        if (seekId && seekPosition) {
-          return {
-            seekId,
-            seekPosition,
-          };
-        }
-        return null;
-      })
-      .filter((c): c is EbmlSeekEntry => !!c);
+  componentFromTag(tag: E): InferType<S> {
+    const extracted = convertEbmlTagToComponent(tag);
+    const result = this.schema(extracted);
+    if (result instanceof ArkErrors) {
+      const errors = result;
+      console.error('Parse component from tag error:', tag.toDebugRecord(), errors.flatProblemsByPath)
+      throw errors;
+    }
+    return result as InferType<S>
+  }
+}
+
+export class SeekSystem extends SegmentComponentSystemTrait<EbmlSeekHeadTagType, typeof SeekHeadSchema> {
+  override get schema() {
+    return SeekHeadSchema;
   }
 
-  findSeekPositionBySeekId(seekId: Uint8Array): number | undefined {
-    return this.seekEntries.find((c) => isEqual(c.seekId, seekId))
-      ?.seekPosition;
+  seekHeads: SeekHeadType[] = [];
+  offsetToTagMemo: Map<number, EbmlTagType> = new Map();
+
+  memoTag (tag: EbmlTagType) {
+    this.offsetToTagMemo.set(tag.startOffset, tag);
   }
 
-  findLocalNodeBySeekId(seekId: Uint8Array): EbmlTagType | undefined {
-    return this.findLocalNodeBySeekPosition(
-      this.findSeekPositionBySeekId(seekId)
-    );
+  addSeekHeadTag (tag: EbmlSeekHeadTagType) {
+    const seekHead = this.componentFromTag(tag);
+    this.seekHeads.push(seekHead);
+    return seekHead;
   }
 
-  findLocalNodeBySeekPosition(
-    seekPosition: number | undefined
+  offsetFromSeekPosition (position: number): number {
+    return position + this.segment.startOffset;
+  }
+
+  offsetFromSeekDataPosition (position: number) : number {
+    return position + this.segment.dataStartOffset;
+  }
+
+  seekTagByStartOffset (
+    startOffset: number | undefined
   ): EbmlTagType | undefined {
-    return seekPosition! >= 0
-      ? this.metaOffsets.get(seekPosition as number)
+    return startOffset! >= 0
+      ? this.offsetToTagMemo.get(startOffset!)
       : undefined;
   }
 
-  markMetaEnd() {
-    this.infoNode = this.findLocalNodeBySeekId(
-      SEEK_ID_KAX_INFO
-    ) as EbmlInfoTagType;
-    this.tracksNode = this.findLocalNodeBySeekId(
-      SEEK_ID_KAX_TRACKS
-    ) as EbmlTracksTagType;
-    this.cuesNode = this.findLocalNodeBySeekId(
-      SEEK_ID_KAX_CUES
-    ) as EbmlCuesTagType;
+  seekOffsetBySeekId(seekId: Uint8Array): number | undefined {
+    const seekPosition = this.seekHeads[0]?.Seek?.find((c) => isEqual(c.SeekID, seekId))
+      ?.SeekPosition;
+    return seekPosition! >= 0 ? this.offsetFromSeekPosition(seekPosition!) : undefined;
   }
 
-  scanMeta(node: EbmlTagType): boolean {
-    if (
-      node.id === EbmlTagIdEnum.SeekHead &&
-      node.position === EbmlTagPosition.End
-    ) {
-      this.addSeekHead(node);
-    }
-    this.metaBuffer.push(node);
-    this.metaOffsets.set(node.startOffset - this.dataOffset, node);
-    return true;
+  seekTagBySeekId(seekId: Uint8Array): EbmlTagType | undefined {
+    return this.seekTagByStartOffset(
+      this.seekOffsetBySeekId(seekId)
+    );
   }
 }
 
-export class CuesSystem extends StandardComponentSystem<
+export class InfoSystem extends SegmentComponentSystemTrait<EbmlInfoTagType, typeof InfoSchema> {
+  override get schema() {
+    return InfoSchema;
+  }
+
+  info!: InfoType;
+
+  prepareWithInfoTag (tag: EbmlInfoTagType) {
+    this.info = this.componentFromTag(tag);
+    return this;
+  }
+}
+
+export class ClusterSystem extends SegmentComponentSystemTrait<EbmlClusterTagType, typeof ClusterSchema> {
+  override get schema() {
+    return ClusterSchema
+  }
+
+  clustersBuffer: ClusterType[] = [];
+
+  addClusterWithTag (tag: EbmlClusterTagType): ClusterType {
+    const cluster = this.componentFromTag(tag);
+    this.clustersBuffer.push(cluster);
+    return cluster;
+  }
+}
+
+export class TrackSystem extends SegmentComponentSystemTrait<EbmlTrackEntryTagType, typeof TrackEntrySchema> {
+  override get schema() {
+    return TrackEntrySchema;
+  }
+
+  tracks = new Map<number, TrackEntryType>();
+
+  prepareTracksWithTag (tag: EbmlTracksTagType) {
+    this.tracks.clear();
+    for (const c of tag.children) {
+      if (c.id === EbmlTagIdEnum.TrackEntry) {
+        const trackEntry = this.componentFromTag(c);
+        this.tracks.set(trackEntry.TrackNumber, trackEntry);
+      }
+    }
+    return this;
+  }
+}
+
+export class CueSystem extends SegmentComponentSystemTrait<
   EbmlCuePointTagType,
   typeof CuePointSchema
 > {
-  schema = CuePointSchema;
-  cues: CuePointType[];
+  override get schema () {
+    return CuePointSchema
+  };
 
-  constructor(cues: CuePointType[]) {
-    super();
-    this.cues = cues;
+  cues: CuePointType[] = [];
+
+
+  prepareCuesWithTag (tag: EbmlCuesTagType) {
+    this.cues = tag.children
+      .filter(c => c.id === EbmlTagIdEnum.CuePoint)
+      .map(this.componentFromTag.bind(this));
+    return this;
   }
 
   findClosestCue(seekTime: number): CuePointType | undefined {
@@ -169,5 +263,20 @@ export class CuesSystem extends StandardComponentSystem<
       Math.abs(after.CueTime - seekTime)
       ? before
       : after;
+  }
+
+  getCueTrackPositions (cuePoint: CuePointType, track?: number): CueTrackPositionsType {
+    let cueTrackPositions: CueTrackPositionsType | undefined;
+    if (track! >= 0) {
+      cueTrackPositions = cuePoint.CueTrackPositions.find(c => c.CueTrack === track);
+    }
+   if (!cueTrackPositions) {
+     cueTrackPositions =  maxBy(cuePoint.CueTrackPositions, c => c.CueClusterPosition)!;
+   }
+   return cueTrackPositions;
+  }
+
+  get prepared (): boolean {
+    return this.cues.length > 0;
   }
 }

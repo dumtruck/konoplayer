@@ -26,8 +26,9 @@ import {
   withLatestFrom,
 } from 'rxjs';
 import { createRangedStream } from '@/fetch';
-import { EbmlSegment, Cluster, SEEK_ID_KAX_CUES, CuesSystem } from './model';
+import { SegmentSystem, SEEK_ID_KAX_CUES, type CueSystem } from './model';
 import { isTagIdPos } from './util';
+import type { ClusterType } from "./schema";
 
 export function createRangedEbmlStream(
   url: string,
@@ -124,12 +125,14 @@ export function createEbmlController(src: string) {
 
       const segments$ = segmentStart$.pipe(
         map((startTag) => {
-          const segment = new EbmlSegment(startTag);
+          const segment = new SegmentSystem(startTag);
+          const clusterSystem = segment.cluster;
+          const seekSystem = segment.seek;
 
           const continuousReusedCluster$ = ebml$.pipe(
             filter(isTagIdPos(EbmlTagIdEnum.Cluster, EbmlTagPosition.End)),
             filter((s) => s.id === EbmlTagIdEnum.Cluster),
-            map(Cluster.fromTag.bind(Cluster))
+            map(clusterSystem.addClusterWithTag.bind(clusterSystem))
           );
 
           const segmentEnd$ = ebml$.pipe(
@@ -154,33 +157,27 @@ export function createEbmlController(src: string) {
           );
 
           const withMeta$ = meta$.pipe(
-            reduce((segment, meta) => {
-              segment.scanMeta(meta);
-              return segment;
-            }, segment),
-            map((segment) => {
-              segment.markMetaEnd();
-              return segment;
-            }),
+            reduce((segment, meta) => segment.scanHead(meta), segment),
+            map(segment.completeHeads.bind(segment)),
             take(1),
             shareReplay(1)
           );
 
           const withRemoteCues$ = withMeta$.pipe(
             switchMap((s) => {
-              if (s.cuesNode) {
+              const cueSystem = s.cue;
+              const seekSystem = s.seek;
+              if (cueSystem.prepared) {
                 return EMPTY;
               }
-              const cuesStartOffset =
-                s.dataOffset +
-                (s.findSeekPositionBySeekId(SEEK_ID_KAX_CUES) ?? Number.NaN);
-              if (cuesStartOffset >= 0) {
-                return createRangedEbmlStream(src, cuesStartOffset).pipe(
+              const remoteCuesTagStartOffset = seekSystem.seekOffsetBySeekId(SEEK_ID_KAX_CUES);
+              if (remoteCuesTagStartOffset! >= 0) {
+                return createRangedEbmlStream(src, remoteCuesTagStartOffset).pipe(
                   switchMap((req) => req.ebml$),
                   filter(isTagIdPos(EbmlTagIdEnum.Cues, EbmlTagPosition.End)),
                   withLatestFrom(withMeta$),
                   map(([cues, withMeta]) => {
-                    withMeta.cuesNode = cues;
+                    withMeta.cue.prepareCuesWithTag(cues);
                     return withMeta;
                   })
                 );
@@ -192,12 +189,7 @@ export function createEbmlController(src: string) {
           );
 
           const withLocalCues$ = withMeta$.pipe(
-            switchMap((s) => {
-              if (s.cuesNode) {
-                return of(s);
-              }
-              return EMPTY;
-            }),
+            switchMap((s) => s.cue.prepared ? of(s) : EMPTY),
             shareReplay(1)
           );
 
@@ -210,7 +202,7 @@ export function createEbmlController(src: string) {
             switchMap((empty) => (empty ? withMeta$ : EMPTY))
           );
 
-          const seekWithoutCues = (seekTime: number): Observable<Cluster> => {
+          const seekWithoutCues = (seekTime: number): Observable<ClusterType> => {
             const cluster$ = continuousReusedCluster$.pipe(
               isEmpty(),
               switchMap((empty) => {
@@ -223,7 +215,7 @@ export function createEbmlController(src: string) {
                       filter(
                         isTagIdPos(EbmlTagIdEnum.Cluster, EbmlTagPosition.End)
                       ),
-                      map(Cluster.fromTag.bind(Cluster))
+                      map((tag) => clusterSystem.addClusterWithTag(tag))
                     )
                   : continuousReusedCluster$;
               })
@@ -236,23 +228,23 @@ export function createEbmlController(src: string) {
               scan(
                 (prev, curr) =>
                   [prev?.[1], curr] as [
-                    Cluster | undefined,
-                    Cluster | undefined,
+                    ClusterType | undefined,
+                    ClusterType | undefined,
                   ],
                 [undefined, undefined] as [
-                  Cluster | undefined,
-                  Cluster | undefined,
+                  ClusterType | undefined,
+                  ClusterType | undefined,
                 ]
               ),
-              filter((c) => c[1]?.timestamp! > seekTime),
+              filter((c) => c[1]?.Timestamp! > seekTime),
               map((c) => c[0] ?? c[1]!)
             );
           };
 
           const seekWithCues = (
-            cues: CuesSystem,
+            cues: CueSystem,
             seekTime: number
-          ): Observable<Cluster> => {
+          ): Observable<ClusterType> => {
             if (seekTime === 0) {
               return seekWithoutCues(seekTime);
             }
@@ -265,29 +257,29 @@ export function createEbmlController(src: string) {
 
             return createRangedEbmlStream(
               src,
-              cuePoint.position + segment.dataOffset
+              seekSystem.offsetFromSeekDataPosition(cues.getCueTrackPositions(cuePoint).CueClusterPosition)
             ).pipe(
               switchMap((req) => req.ebml$),
               filter(isTagIdPos(EbmlTagIdEnum.Cluster, EbmlTagPosition.End)),
-              map(Cluster.fromTag.bind(Cluster))
+              map(clusterSystem.addClusterWithTag.bind(clusterSystem))
             );
           };
 
-          const seek = (seekTime: number): Observable<Cluster> => {
+          const seek = (seekTime: number): Observable<ClusterType> => {
             if (seekTime === 0) {
-              const subscripton = merge(withCues$, withoutCues$).subscribe();
+              const subscription = merge(withCues$, withoutCues$).subscribe();
 
               // if seekTime equals to 0 at start, reuse the initialize stream
               return seekWithoutCues(seekTime).pipe(
                 finalize(() => {
-                  subscripton.unsubscribe();
+                  subscription.unsubscribe();
                 })
               );
             }
             return merge(
               withCues$.pipe(
                 switchMap((s) =>
-                  seekWithCues(CuesSystem.fromTag(s.cuesNode!), seekTime)
+                  seekWithCues(s.cue, seekTime)
                 )
               ),
               withoutCues$.pipe(switchMap((_) => seekWithoutCues(seekTime)))

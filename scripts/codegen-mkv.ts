@@ -390,6 +390,9 @@ function generateMkvSchemaHierarchy(elements_: EbmlElementType[]) {
           : meta.primitive(v.name);
         if (v.maxOccurs !== 1) {
           expr = `${expr}.array()`;
+          if (v.maxOccurs !== 1 && v.minOccurs === 1 && !v.default) {
+            expr = `${expr}.atLeastLength(1)`
+          }
           idMulti.add(v.name);
         }
         if (v.default) {
