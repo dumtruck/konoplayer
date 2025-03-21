@@ -4,65 +4,56 @@ import type { EbmlMasterTagType, EbmlTagIdEnum, EbmlTagType } from 'konoebml';
 export type InferType<T> = T extends Type<infer U> ? U : never;
 
 export interface TagWithArktypeOptions<
-  I extends EbmlTagType['id'],
+  T extends EbmlTagType,
   S extends Type<any>,
 > {
-  id: I;
+  id: T['id'];
   schema: S;
-  extract: (tag: Extract<EbmlTagType, { id: I }>, schema: S) => InferType<S>;
+  extract: (tag: T, schema: S) => InferType<S>;
 }
 
 export type TagWithArktypeClassInstance<
-  I extends EbmlTagType['id'],
+  T extends EbmlTagType,
   S extends Type<any>,
 > = InferType<S> & {
-  tag: Extract<EbmlTagType, { id: I }>;
+  tag: T;
 };
 
 export interface TagWithArktypeClass<
-  I extends EbmlTagType['id'],
+  T extends EbmlTagType,
   S extends Type<any>,
 > {
-  new (
-    tag: Extract<EbmlTagType, { id: I }>,
-    validatedTag: InferType<S>
-  ): TagWithArktypeClassInstance<I, S>;
+  new (tag: T, validatedTag: InferType<S>): TagWithArktypeClassInstance<T, S>;
 
-  fromTag<R extends TagWithArktypeClassInstance<I, S>>(
+  fromTag<R extends TagWithArktypeClassInstance<T, S>>(
     this: new (
-      tag: Extract<EbmlTagType, { id: I }>,
+      tag: T,
       validatedTag: InferType<S>
-    ) => TagWithArktypeClassInstance<I, S>,
-    tag: Extract<EbmlTagType, { id: I }>
+    ) => TagWithArktypeClassInstance<T, S>,
+    tag: T
   ): R;
 
-  id: I;
+  id: T['id'];
   schema: S;
 }
 
-export function TagWithArktype<
-  I extends EbmlTagType['id'],
-  S extends Type<any>,
->({
+export function TagWithArktype<T extends EbmlTagType, S extends Type<any>>({
   id,
   schema,
   extract,
-}: TagWithArktypeOptions<I, S>): TagWithArktypeClass<I, S> {
+}: TagWithArktypeOptions<T, S>): TagWithArktypeClass<T, S> {
   const tagWithArktypeImpl = class TagWithArktypeImpl {
     static id = id;
     static schema = schema;
 
-    tag: Extract<EbmlTagType, { id: I }>;
+    tag: T;
 
-    constructor(
-      tag: Extract<EbmlTagType, { id: I }>,
-      validatedTag: InferType<S>
-    ) {
+    constructor(tag: T, validatedTag: InferType<S>) {
       Object.assign(this, validatedTag);
       this.tag = tag;
     }
 
-    static fromTag(tag: Extract<EbmlTagType, { id: I }>) {
+    static fromTag(tag: T) {
       const extractedData = extract(tag, schema);
       const validatedExtractedData = schema(extractedData);
       // biome-ignore lint/complexity/noThisInStatic: <explanation>
@@ -70,7 +61,7 @@ export function TagWithArktype<
     }
   };
 
-  return tagWithArktypeImpl as unknown as TagWithArktypeClass<I, S>;
+  return tagWithArktypeImpl as unknown as TagWithArktypeClass<T, S>;
 }
 
 export type PredicateIdExtract<T, K> = Extract<T, { id: K }>;

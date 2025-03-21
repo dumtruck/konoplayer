@@ -80,8 +80,8 @@ importers:
   apps/playground:
     dependencies:
       konoebml:
-        specifier: 0.1.0-rc.8
-        version: 0.1.0-rc.8
+        specifier: 0.1.0
+        version: 0.1.0(arktype@2.1.10)
       lit:
         specifier: ^3.2.1
         version: 3.2.1
@@ -1853,9 +1853,14 @@ packages:
     resolution: {integrity: sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw==}
     engines: {node: '>=0.10.0'}
 
-  konoebml@0.1.0-rc.8:
-    resolution: {integrity: sha512-fR4DZqCskLKxGBMc58gpOOzajFrfu9hQC7WZd8yGiIxLVhDkzBnihXqlsWJU6Qw77ukMOGGkbeM2uqQyv5dO3w==}
+  konoebml@0.1.0:
+    resolution: {integrity: sha512-Fp4nJBr9E82sr2Ap0JwHZFoeyNH7Cy0NdVXRcJ54wxCNfs3MHfo9IXnSLph/zvkGT1b5qw7JSs4nwoygZF4F7g==}
     engines: {node: '>= 18.0.0'}
+    peerDependencies:
+      arktype: ^2.0.0
+    peerDependenciesMeta:
+      arktype:
+        optional: true
 
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
@@ -4462,10 +4467,12 @@ snapshots:
 
   kind-of@6.0.3: {}
 
-  konoebml@0.1.0-rc.8:
+  konoebml@0.1.0(arktype@2.1.10):
     dependencies:
       mnemonist: 0.40.3
       type-fest: 4.37.0
+    optionalDependencies:
+      arktype: 2.1.10
 
   lines-and-columns@1.2.4: {}
 

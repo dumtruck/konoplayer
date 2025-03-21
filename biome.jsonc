@@ -6,6 +6,7 @@
     "linter": {
         "rules": {
             "style": {
+                "noParameterProperties": "off",
                 "noNonNullAssertion": "off"
             },
             "suspicious": {
@@ -16,6 +17,9 @@
             },
             "complexity": {
                 "noBannedTypes": "off"
+            },
+            "nursery": {
+                "useConsistentMemberAccessibility": "off"
             }
         }
     },

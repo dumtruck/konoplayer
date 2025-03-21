@@ -2,7 +2,6 @@ import {
   type EbmlTagType,
   EbmlTagIdEnum,
   EbmlTagPosition,
-  type EbmlCuePointTagType,
   type EbmlTracksTagType,
   type EbmlInfoTagType,
   type EbmlCuesTagType,
@@ -127,13 +126,11 @@ export class TrackEntry extends TagWithArktype({
   }),
 }) {}
 
-const TracksSchema = type({
-  tracks: type.instanceOf(TrackEntry).array(),
-});
-
 export class Tracks extends TagWithArktype({
   id: EbmlTagIdEnum.Tracks,
-  schema: TracksSchema,
+  schema: type({
+    tracks: type.instanceOf(TrackEntry).array(),
+  }),
   extract: simpleMasterExtractor({
     [EbmlTagIdEnum.TrackEntry]: {
       key: 'tracks',
@@ -148,13 +145,11 @@ export interface EbmlSeekEntry {
   seekPosition: number;
 }
 
-export class EbmlHead {
-  head: EbmlTagType;
-
-  constructor(head: EbmlTagType) {
-    this.head = head;
-  }
-}
+export class MHead extends TagWithArktype({
+  id: EbmlTagIdEnum.EBML,
+  schema: type({}),
+  extract: () => ({}),
+}) {}
 
 export class SimpleBlock extends TagWithArktype({
   id: EbmlTagIdEnum.SimpleBlock,
@@ -164,6 +159,12 @@ export class SimpleBlock extends TagWithArktype({
   extract: (tag) => ({
     frame: tag.payload,
   }),
+}) {}
+
+export class Block extends TagWithArktype({
+  id: EbmlTagIdEnum.Block,
+  schema: type({}),
+  extract: () => ({}),
 }) {}
 
 export class Cluster extends TagWithArktype({
@@ -191,88 +192,16 @@ export class Cluster extends TagWithArktype({
   }),
 }) {}
 
-export interface TrackPositions {
-  track: number;
-  clusterPosition: number;
-  relativePosition?: number;
-  duration?: number;
-}
+export type CuePointType = typeof CuePoint.infer;
 
-export class CuePoint {
-  node: EbmlCuePointTagType;
-  _timestamp: number;
-  trackPositions: TrackPositions[];
+export class Cues {
+  cues: CuePointType[];
 
-  get timestamp(): number {
-    return this._timestamp;
-  }
+  constructor(
+    public readonly tag: EbmlCuesTagType,
+    cues: CuePointType[]
+  ) {}
 
-  get position(): number {
-    return Math.max(...this.trackPositions.map((t) => t.clusterPosition));
-  }
-
-  constructor(node: EbmlCuePointTagType) {
-    this.node = node;
-    this._timestamp = node.children.find((c) => c.id === EbmlTagIdEnum.CueTime)
-      ?.data as number;
-    this.trackPositions = node.children
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
-      .map((t) => {
-        if (
-          t.id === EbmlTagIdEnum.CueTrackPositions &&
-          t.position === EbmlTagPosition.End
-        ) {
-          let track!: number;
-          let clusterPosition!: number;
-          let relativePosition: number | undefined;
-          let duration: number | undefined;
-
-          for (const c of t.children) {
-            if (c.id === EbmlTagIdEnum.CueTrack) {
-              track = c.data as number;
-            }
-            if (c.id === EbmlTagIdEnum.CueClusterPosition) {
-              clusterPosition = c.data as number;
-            }
-            if (c.id === EbmlTagIdEnum.CueRelativePosition) {
-              relativePosition = c.data as number;
-            }
-            if (c.id === EbmlTagIdEnum.CueDuration) {
-              duration = c.data as number;
-            }
-          }
-
-          if (track! >= 0 && clusterPosition! >= 0) {
-            return {
-              track: track!,
-              clusterPosition: clusterPosition!,
-              relativePosition,
-              duration,
-            } as TrackPositions;
-          }
-          throw new Error(
-            `Tracking positions missing track of cluster position at ${t.startOffset}`
-          );
-        }
-        return null;
-      })
-      .filter((a): a is TrackPositions => !!a);
-  }
-}
-
-export class Cues extends TagWithArktype({
-  id: EbmlTagIdEnum.Cues,
-  schema: type({
-    cues: type.instanceOf(CuePoint).array(),
-  }),
-  extract: simpleMasterExtractor({
-    [EbmlTagIdEnum.CuePoint]: {
-      key: 'cues',
-      multi: true,
-      extract: (t) => new CuePoint(t),
-    },
-  }),
-}) {
   findClosestCue(seekTime: number): CuePoint | null {
     const cues = this.cues;
     if (!cues || cues.length === 0) {
@@ -282,22 +211,22 @@ export class Cues extends TagWithArktype({
     let left = 0;
     let right = cues.length - 1;
 
-    if (seekTime <= cues[0].timestamp) {
+    if (seekTime <= cues[0].CueTime) {
       return cues[0];
     }
 
-    if (seekTime >= cues[right].timestamp) {
+    if (seekTime >= cues[right].CueTime) {
       return cues[right];
     }
 
     while (left <= right) {
       const mid = Math.floor((left + right) / 2);
 
-      if (cues[mid].timestamp === seekTime) {
+      if (cues[mid].CueTime === seekTime) {
         return cues[mid];
       }
 
-      if (cues[mid].timestamp < seekTime) {
+      if (cues[mid].CueTime < seekTime) {
         left = mid + 1;
       } else {
         right = mid - 1;
