@@ -9,7 +9,7 @@
     "preview": "rsbuild preview"
   },
   "dependencies": {
-    "konoebml": "0.1.0",
+    "konoebml": "0.1.1",
     "lit": "^3.2.1"
   },
   "devDependencies": {

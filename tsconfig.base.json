@@ -14,18 +14,19 @@
             "DOM.AsyncIterable",
             "DOM.Iterable"
         ],
-        "module": "NodeNext",
+        "module": "ESNext",
         "moduleDetection": "force",
-        "moduleResolution": "nodenext",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "allowImportingTsExtensions": true,
         "emitDeclarationOnly": true,
         "skipLibCheck": true,
-        "target": "ES2020",
+        "target": "ES2021",
         "strictNullChecks": true,
         "strict": true,
         "noUnusedLocals": true,
         "noUnusedParameters": true,
-        "useDefineForClassFields": true
+        "useDefineForClassFields": true,
+        "exactOptionalPropertyTypes": false,
     }
 }

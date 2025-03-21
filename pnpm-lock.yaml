@@ -33,6 +33,12 @@ importers:
       '@types/node':
         specifier: ^22.13.8
         version: 22.13.9
+      change-case:
+        specifier: ^5.4.4
+        version: 5.4.4
+      happy-dom:
+        specifier: ^17.4.4
+        version: 17.4.4
       tsx:
         specifier: ^4.19.2
         version: 4.19.3
@@ -80,8 +86,8 @@ importers:
   apps/playground:
     dependencies:
       konoebml:
-        specifier: 0.1.0
-        version: 0.1.0(arktype@2.1.10)
+        specifier: 0.1.1
+        version: 0.1.1(arktype@2.1.10)
       lit:
         specifier: ^3.2.1
         version: 3.2.1
@@ -1213,6 +1219,9 @@ packages:
     resolution: {integrity: sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==}
     engines: {node: '>=10'}
 
+  change-case@5.4.4:
+    resolution: {integrity: sha512-HRQyTk2/YPEkt9TnUPbOpr64Uw3KOicFWPVBb+xiHvd6eBx/qPr9xqfBFDT8P2vWsvvz4jbEkfDe71W3VyNu2w==}
+
   chardet@0.7.0:
     resolution: {integrity: sha512-mT8iDcrh03qDGRRmoA2hmBJnxpllMR+0/0qlzjqZES6NdiWDcZkCNAk4rPFZ9Q85r27unkiNNg8ZOiwZXBHwcA==}
 
@@ -1674,6 +1683,10 @@ packages:
     resolution: {integrity: sha512-ffkD1lS3Hl5l/6L6dy93BugNUMCS+0pD730uOj+1T5iHKh7wOwDp95P2xf4PLjezssg8JQzHzBydeWjs1BuyOw==}
     engines: {node: '>= 0.12.0'}
 
+  happy-dom@17.4.4:
+    resolution: {integrity: sha512-/Pb0ctk3HTZ5xEL3BZ0hK1AqDSAUuRQitOmROPHhfUYEWpmTImwfD8vFDGADmMAX0JYgbcgxWoLFKtsWhcpuVA==}
+    engines: {node: '>=18.0.0'}
+
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
@@ -1853,8 +1866,8 @@ packages:
     resolution: {integrity: sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw==}
     engines: {node: '>=0.10.0'}
 
-  konoebml@0.1.0:
-    resolution: {integrity: sha512-Fp4nJBr9E82sr2Ap0JwHZFoeyNH7Cy0NdVXRcJ54wxCNfs3MHfo9IXnSLph/zvkGT1b5qw7JSs4nwoygZF4F7g==}
+  konoebml@0.1.1:
+    resolution: {integrity: sha512-JuQnHgsoDrschZetWaZfHfTmjCXFV3B31f5Y+FzfHsFs1lQKGNH0ILj+IpyItnuq1KFwkGbslc9EBxY0CDWTFw==}
     engines: {node: '>= 18.0.0'}
     peerDependencies:
       arktype: ^2.0.0
@@ -2637,6 +2650,10 @@ packages:
   wcwidth@1.0.1:
     resolution: {integrity: sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg==}
 
+  webidl-conversions@7.0.0:
+    resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
+    engines: {node: '>=12'}
+
   webpack-node-externals@3.0.0:
     resolution: {integrity: sha512-LnL6Z3GGDPht/AigwRh2dvL9PQPFQ8skEpVrWZXLWBYmqcaojHNN0onvHzie6rq7EWKrrBfPYqNEzTJgiwEQDQ==}
     engines: {node: '>=6'}
@@ -2657,6 +2674,10 @@ packages:
 
   weinre2@1.3.6:
     resolution: {integrity: sha512-xKawRFdgaFvxDDsb0jJ7KpnqYaAFFMvd+VlhFHdi/YSCJSGjYCxjMHuDobViddZVosfiGkQQv6/GHKqxN98EaQ==}
+
+  whatwg-mimetype@3.0.0:
+    resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
+    engines: {node: '>=12'}
 
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
@@ -3790,6 +3811,8 @@ snapshots:
       ansi-styles: 4.3.0
       supports-color: 7.2.0
 
+  change-case@5.4.4: {}
+
   chardet@0.7.0: {}
 
   chokidar@3.6.0:
@@ -4327,6 +4350,11 @@ snapshots:
     dependencies:
       safe-buffer: 5.2.1
 
+  happy-dom@17.4.4:
+    dependencies:
+      webidl-conversions: 7.0.0
+      whatwg-mimetype: 3.0.0
+
   has-flag@4.0.0: {}
 
   has-own-prop@2.0.0: {}
@@ -4467,7 +4495,7 @@ snapshots:
 
   kind-of@6.0.3: {}
 
-  konoebml@0.1.0(arktype@2.1.10):
+  konoebml@0.1.1(arktype@2.1.10):
     dependencies:
       mnemonist: 0.40.3
       type-fest: 4.37.0
@@ -5223,6 +5251,8 @@ snapshots:
     dependencies:
       defaults: 1.0.4
 
+  webidl-conversions@7.0.0: {}
+
   webpack-node-externals@3.0.0: {}
 
   webpack-sources@3.2.3: {}
@@ -5265,6 +5295,8 @@ snapshots:
       underscore: 1.13.7
     transitivePeerDependencies:
       - supports-color
+
+  whatwg-mimetype@3.0.0: {}
 
   which@2.0.2:
     dependencies:

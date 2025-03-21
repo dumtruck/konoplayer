@@ -7,15 +7,32 @@ import {
   type EbmlCuesTagType,
   type EbmlSeekHeadTagType,
   type EbmlSegmentTagType,
+  type EbmlCuePointTagType,
+  type EbmlMasterTagType,
 } from 'konoebml';
-import { isTagIdPos, simpleMasterExtractor } from './util';
+import {
+  convertEbmlTagToModelShape,
+  type InferType,
+  isTagIdPos,
+  SEEK_ID_KAX_CUES,
+  SEEK_ID_KAX_INFO,
+  SEEK_ID_KAX_TRACKS,
+} from './util';
 import { isEqual } from 'lodash-es';
-import { type } from 'arktype';
-import { TagWithArktype } from './util';
+import type { Type } from 'arktype';
+import { CuePointSchema, type CuePointType } from './schema';
 
-export const SEEK_ID_KAX_INFO = new Uint8Array([0x15, 0x49, 0xa9, 0x66]);
-export const SEEK_ID_KAX_TRACKS = new Uint8Array([0x16, 0x54, 0xae, 0x6b]);
-export const SEEK_ID_KAX_CUES = new Uint8Array([0x1c, 0x53, 0xbb, 0x6b]);
+export abstract class StandardComponentSystem<
+  E extends EbmlMasterTagType,
+  S extends Type<any>,
+> {
+  abstract get schema(): S;
+
+  componentFromTag(tag: E): InferType<S> {
+    const extracted = convertEbmlTagToModelShape(tag);
+    return this.schema.assert(extracted) as InferType<S>;
+  }
+}
 
 export class EbmlSegment {
   startNode: EbmlSegmentTagType;
@@ -103,109 +120,22 @@ export class EbmlSegment {
   }
 }
 
-export class TrackEntry extends TagWithArktype({
-  id: EbmlTagIdEnum.TrackEntry,
-  schema: type({
-    trackNumber: 'number',
-    trackType: 'number',
-    trackUID: 'number',
-  }),
-  extract: simpleMasterExtractor({
-    [EbmlTagIdEnum.TrackNumber]: {
-      key: 'trackNumber',
-      extract: (t) => t.data as number,
-    },
-    [EbmlTagIdEnum.TrackType]: {
-      key: 'trackType',
-      extract: (t) => t.data as number,
-    },
-    [EbmlTagIdEnum.TrackUID]: {
-      key: 'trackUID',
-      extract: (t) => t.data as number,
-    },
-  }),
-}) {}
-
-export class Tracks extends TagWithArktype({
-  id: EbmlTagIdEnum.Tracks,
-  schema: type({
-    tracks: type.instanceOf(TrackEntry).array(),
-  }),
-  extract: simpleMasterExtractor({
-    [EbmlTagIdEnum.TrackEntry]: {
-      key: 'tracks',
-      multi: true,
-      extract: TrackEntry.fromTag.bind(TrackEntry),
-    },
-  }),
-}) {}
-
-export interface EbmlSeekEntry {
-  seekId: Uint8Array;
-  seekPosition: number;
-}
-
-export class MHead extends TagWithArktype({
-  id: EbmlTagIdEnum.EBML,
-  schema: type({}),
-  extract: () => ({}),
-}) {}
-
-export class SimpleBlock extends TagWithArktype({
-  id: EbmlTagIdEnum.SimpleBlock,
-  schema: type({
-    frame: type.instanceOf(Uint8Array),
-  }),
-  extract: (tag) => ({
-    frame: tag.payload,
-  }),
-}) {}
-
-export class Block extends TagWithArktype({
-  id: EbmlTagIdEnum.Block,
-  schema: type({}),
-  extract: () => ({}),
-}) {}
-
-export class Cluster extends TagWithArktype({
-  id: EbmlTagIdEnum.Cluster,
-  schema: type({
-    timestamp: 'number',
-    position: 'number?',
-    prevSize: 'number?',
-    simpleBlock: type.instanceOf(SimpleBlock).array(),
-  }),
-  extract: simpleMasterExtractor({
-    [EbmlTagIdEnum.Timecode]: {
-      key: 'timestamp',
-      extract: (t) => t.data as number,
-    },
-    [EbmlTagIdEnum.PrevSize]: {
-      key: 'prevSize',
-      extract: (t) => t.data as number,
-    },
-    [EbmlTagIdEnum.SimpleBlock]: {
-      key: 'simpleBlock',
-      multi: true,
-      extract: SimpleBlock.fromTag.bind(SimpleBlock),
-    },
-  }),
-}) {}
-
-export type CuePointType = typeof CuePoint.infer;
-
-export class Cues {
+export class CuesSystem extends StandardComponentSystem<
+  EbmlCuePointTagType,
+  typeof CuePointSchema
+> {
+  schema = CuePointSchema;
   cues: CuePointType[];
 
-  constructor(
-    public readonly tag: EbmlCuesTagType,
-    cues: CuePointType[]
-  ) {}
+  constructor(cues: CuePointType[]) {
+    super();
+    this.cues = cues;
+  }
 
-  findClosestCue(seekTime: number): CuePoint | null {
+  findClosestCue(seekTime: number): CuePointType | undefined {
     const cues = this.cues;
     if (!cues || cues.length === 0) {
-      return null;
+      return undefined;
     }
 
     let left = 0;
@@ -235,8 +165,8 @@ export class Cues {
 
     const before = cues[right];
     const after = cues[left];
-    return Math.abs(before.timestamp - seekTime) <
-      Math.abs(after.timestamp - seekTime)
+    return Math.abs(before.CueTime - seekTime) <
+      Math.abs(after.CueTime - seekTime)
       ? before
       : after;
   }

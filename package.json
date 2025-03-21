@@ -2,10 +2,13 @@
   "name": "konoplayer",
   "version": "0.0.1",
   "description": "A strange player, like the dumtruck, taking you to Isekai.",
-  "scripts": {},
+  "scripts": {
+    "codegen-mkv": "tsx --tsconfig=./tsconfig.scripts.json ./scripts/codegen-mkv.ts"
+  },
   "keywords": [],
   "author": "lonelyhentxi",
   "license": "MIT",
+  "type": "module",
   "packageManager": "pnpm@10.6.1",
   "engines": {
     "node": ">=22"
@@ -13,6 +16,8 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@types/node": "^22.13.8",
+    "change-case": "^5.4.4",
+    "happy-dom": "^17.4.4",
     "tsx": "^4.19.2",
     "typescript": "^5.8.2",
     "ultracite": "^4.1.15"

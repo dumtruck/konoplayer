@@ -19,6 +19,7 @@
                 "noBannedTypes": "off"
             },
             "nursery": {
+                "noEnum": "off",
                 "useConsistentMemberAccessibility": "off"
             }
         }
@@ -32,6 +33,21 @@
         {
             "include": [
                 "apps/playground/**"
+            ],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noConsole": "off"
+                    },
+                    "performance": {
+                        "useTopLevelRegex": "off"
+                    }
+                }
+            }
+        },
+        {
+            "include": [
+                "scripts/**"
             ],
             "linter": {
                 "rules": {

@@ -26,7 +26,7 @@ import {
   withLatestFrom,
 } from 'rxjs';
 import { createRangedStream } from '@/fetch';
-import { EbmlSegment, Cluster, SEEK_ID_KAX_CUES, Cues } from './model';
+import { EbmlSegment, Cluster, SEEK_ID_KAX_CUES, CuesSystem } from './model';
 import { isTagIdPos } from './util';
 
 export function createRangedEbmlStream(
@@ -250,7 +250,7 @@ export function createEbmlController(src: string) {
           };
 
           const seekWithCues = (
-            cues: Cues,
+            cues: CuesSystem,
             seekTime: number
           ): Observable<Cluster> => {
             if (seekTime === 0) {
@@ -287,7 +287,7 @@ export function createEbmlController(src: string) {
             return merge(
               withCues$.pipe(
                 switchMap((s) =>
-                  seekWithCues(Cues.fromTag(s.cuesNode!), seekTime)
+                  seekWithCues(CuesSystem.fromTag(s.cuesNode!), seekTime)
                 )
               ),
               withoutCues$.pipe(switchMap((_) => seekWithoutCues(seekTime)))

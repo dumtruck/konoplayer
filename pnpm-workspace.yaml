@@ -4,5 +4,6 @@ packages:
 onlyBuiltDependencies:
   - '@biomejs/biome'
   - '@nestjs/core'
+  - '@swc/core'
   - core-js
   - esbuild
