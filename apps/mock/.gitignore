@@ -1,1 +1,2 @@
-public/video-sample/huge/*
+public/video/huge/*
+!public/video/huge/.gitkeep

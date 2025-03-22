@@ -27,7 +27,7 @@ export function isTagPos<
     pos === '*' || pos === tag.position;
 }
 
-export function convertEbmlTagToComponent (tag: EbmlTagType) {
+export function convertEbmlTagToComponent(tag: EbmlTagType) {
   if (tag.type === EbmlElementType.Master) {
     const obj: Record<string, any> = {};
     const children = tag.children;
@@ -50,4 +50,13 @@ export function convertEbmlTagToComponent (tag: EbmlTagType) {
     return tag;
   }
   return tag.data;
+}
+
+export function waitTick() {
+  return new Promise<void>((resolve) => {
+    const timeout = setTimeout(() => {
+      resolve();
+      timeout && clearTimeout(timeout);
+    }, 0);
+  });
 }

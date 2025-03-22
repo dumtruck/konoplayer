@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "description": "A strange player, like the dumtruck, taking you to Isekai.",
   "scripts": {
-    "codegen-mkv": "tsx --tsconfig=./tsconfig.scripts.json ./scripts/codegen-mkv.ts"
+    "codegen-mkv": "tsx --tsconfig=./tsconfig.scripts.json ./scripts/codegen-mkv.ts",
+    "download-samples": "tsx --tsconfig=./tsconfig.scripts.json ./scripts/download-samples.ts"
   },
   "keywords": [],
   "author": "lonelyhentxi",
@@ -15,12 +16,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
-    "@types/node": "^22.13.8",
+    "@types/node": "^22.13.11",
     "change-case": "^5.4.4",
     "happy-dom": "^17.4.4",
-    "tsx": "^4.19.2",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.2",
-    "ultracite": "^4.1.15"
+    "ultracite": "^4.2.0"
   },
   "dependencies": {
     "@types/lodash-es": "^4.17.12",

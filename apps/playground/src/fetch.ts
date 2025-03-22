@@ -5,11 +5,17 @@ export interface RangedStream {
   totalSize?: number;
 }
 
-export async function createRangedStream(
-  url: string,
+export interface CreateRangedStreamOptions {
+  url: string;
+  byteStart?: number;
+  byteEnd?: number;
+}
+
+export async function createRangedStream({
+  url,
   byteStart = 0,
-  byteEnd?: number
-) {
+  byteEnd,
+}: CreateRangedStreamOptions) {
   const controller = new AbortController();
   const signal = controller.signal;
   const headers = new Headers();

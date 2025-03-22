@@ -43,15 +43,15 @@ const EbmlTypeMetas = {
   },
   uinteger: {
     code: 'Uint',
-    primitive: () => 'type.number',
+    primitive: () => 'type.number.or(type.bigint)',
     default: (d: string): string => d,
-    primitiveStr: () => 'number',
+    primitiveStr: () => '(number | bigint)',
   },
   integer: {
     code: 'Int',
-    primitive: () => 'type.number',
+    primitive: () => 'type.number.or(type.bigint)',
     default: (d: string) => d,
-    primitiveStr: () => 'number',
+    primitiveStr: () => '(number | bigint)',
   },
   float: {
     code: 'Float',
@@ -160,7 +160,7 @@ function extractElement(element: Element) {
   );
 
   assert(typeof path_ === 'string', `path of ${name} is not string ${element}`);
-  const path = path_.split('\\').filter(Boolean);
+  const path = path_.replace(/\\\+/g, '\\').split('\\').filter(Boolean);
   const parentPath = path.at(-2);
   const prefix = path.slice(0, -1);
   const level = path.length - 1;
@@ -391,7 +391,7 @@ function generateMkvSchemaHierarchy(elements_: EbmlElementType[]) {
         if (v.maxOccurs !== 1) {
           expr = `${expr}.array()`;
           if (v.maxOccurs !== 1 && v.minOccurs === 1 && !v.default) {
-            expr = `${expr}.atLeastLength(1)`
+            expr = `${expr}.atLeastLength(1)`;
           }
           idMulti.add(v.name);
         }
@@ -401,9 +401,8 @@ function generateMkvSchemaHierarchy(elements_: EbmlElementType[]) {
           } else {
             childrenSchema.push(`export const ${v.name}Schema = match({
 "${meta.primitiveStr(v.name)}[]": v => v.length > 0 ? v : [${meta.default(v.default)}],
-"undefined": () => [${meta.default(v.default)}],
-default: "assert"
-});`);
+default: () => [${meta.default(v.default)}],
+}).optional();`);
             expr = `${v.name}Schema`;
           }
         } else if (!v.minOccurs) {

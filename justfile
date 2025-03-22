@@ -6,3 +6,6 @@ dev-playground:
 
 dev-proxy:
     pnpm run --filter proxy --filter mock dev
+
+download-samples:
+    pnpm run download-samples
