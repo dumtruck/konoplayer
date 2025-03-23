@@ -17,6 +17,9 @@ importers:
       lodash-es:
         specifier: ^4.17.21
         version: 4.17.21
+      media-codecs:
+        specifier: ^2.0.2
+        version: 2.0.2
       mnemonist:
         specifier: ^0.40.3
         version: 0.40.3
@@ -107,6 +110,22 @@ importers:
       whistle:
         specifier: ^2.9.93
         version: 2.9.94
+
+  packages/codecs:
+    dependencies:
+      konoebml:
+        specifier: 0.1.2-rc.5
+        version: 0.1.2-rc.5(arktype@2.1.10)
+      lit:
+        specifier: ^3.2.1
+        version: 3.2.1
+    devDependencies:
+      '@rsbuild/core':
+        specifier: ^1.2.14
+        version: 1.2.15
+      typescript:
+        specifier: ^5.8.2
+        version: 5.8.2
 
 packages:
 
@@ -1922,6 +1941,10 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
+
+  media-codecs@2.0.2:
+    resolution: {integrity: sha512-D7ygdW7j5yqkDJ9kX5H4UU2iC/fsreU2Vy49GxbN6OUeYso6U2QG6QgcwSn75eFUoM6ttVuTLAOt4qxQvLWdFw==}
+    engines: {node: '>=22.0.0', npm: '>=10.5.1', snowdev: '>=2.2.x'}
 
   media-typer@0.3.0:
     resolution: {integrity: sha512-dq+qelQ9akHpcOl/gUVRTxVIOkAJ1wR3QAvb4RsVjS8oVoFjDGTc679wJYmUmknUF5HwMLOgb5O+a3KxfWapPQ==}
@@ -4549,6 +4572,8 @@ snapshots:
       semver: 7.7.1
 
   math-intrinsics@1.1.0: {}
+
+  media-codecs@2.0.2: {}
 
   media-typer@0.3.0: {}
 

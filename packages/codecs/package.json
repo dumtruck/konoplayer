@@ -1,0 +1,19 @@
+{
+    "name": "konoplayer-codecs",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "rsbuild build",
+        "dev": "rsbuild dev",
+        "preview": "rsbuild preview"
+    },
+    "dependencies": {
+        "konoebml": "0.1.2-rc.5",
+        "lit": "^3.2.1"
+    },
+    "devDependencies": {
+        "@rsbuild/core": "^1.2.14",
+        "typescript": "^5.8.2"
+    }
+}

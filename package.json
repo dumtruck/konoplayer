@@ -27,6 +27,7 @@
     "@types/lodash-es": "^4.17.12",
     "arktype": "^2.1.10",
     "lodash-es": "^4.17.21",
+    "media-codecs": "^2.0.2",
     "mnemonist": "^0.40.3",
     "rxjs": "^7.8.2",
     "type-fest": "^4.37.0"

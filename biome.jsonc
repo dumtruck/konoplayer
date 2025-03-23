@@ -6,6 +6,7 @@
     "linter": {
         "rules": {
             "style": {
+                "useSingleCaseStatement": "off",
                 "noParameterProperties": "off",
                 "noNonNullAssertion": "off"
             },
