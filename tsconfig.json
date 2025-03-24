@@ -9,6 +9,15 @@
     },
     {
       "path": "./tsconfig.scripts.json"
+    },
+    {
+      "path": "./packages/matroska"
+    },
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./apps/test"
     }
   ]
 }

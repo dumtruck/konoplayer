@@ -1,0 +1,17 @@
+{
+  "name": "@konoplayer/test",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {},
+  "dependencies": {
+    "@konoplayer/core": "workspace:*",
+    "@konoplayer/matroska": "workspace:*",
+    "konoebml": "^0.1.2"
+  },
+  "devDependencies": {
+    "unplugin-swc": "^1.5.1",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.0.9"
+  }
+}

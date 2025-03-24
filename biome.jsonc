@@ -17,7 +17,13 @@
                 "noSvgWithoutTitle": "off"
             },
             "complexity": {
-                "noBannedTypes": "off"
+                "noBannedTypes": "off",
+                "noExcessiveCognitiveComplexity": {
+                    "level": "warn",
+                    "options": {
+                        "maxAllowedComplexity": 40
+                    }
+                }
             },
             "nursery": {
                 "noEnum": "off",
@@ -55,6 +61,33 @@
                     "suspicious": {
                         "noConsole": "off",
                         "noConsoleLog": "off"
+                    },
+                    "performance": {
+                        "useTopLevelRegex": "off"
+                    }
+                }
+            }
+        },
+        {
+            "include": [
+                "apps/test/**"
+            ],
+            "javascript": {
+                "globals": [
+                    "describe",
+                    "beforeEach",
+                    "it",
+                    "expect",
+                    "afterEach"
+                ]
+            },
+            "linter": {
+                "rules": {
+                    "style": {
+                        "useImportType": "off"
+                    },
+                    "suspicious": {
+                        "noConsole": "off"
                     },
                     "performance": {
                         "useTopLevelRegex": "off"

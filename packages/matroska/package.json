@@ -1,0 +1,11 @@
+{
+    "name": "@konoplayer/matroska",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {},
+    "dependencies": {
+        "@konoplayer/core": "workspace:*",
+        "konoebml": "^0.1.2"
+    }
+}

@@ -24,9 +24,8 @@
         "target": "ES2021",
         "strictNullChecks": true,
         "strict": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true,
-        "useDefineForClassFields": true,
+        "useDefineForClassFields": false,
         "exactOptionalPropertyTypes": false,
+        "experimentalDecorators": true
     }
 }

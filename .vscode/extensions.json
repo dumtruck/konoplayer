@@ -1,5 +1,9 @@
 {
     "recommendations": [
-        "runem.lit-plugin"
+        "runem.lit-plugin",
+        "vitest.explorer",
+        "biomejs.biome",
+        "hbenl.vscode-test-explorer",
+        "zerotaskx.rust-extension-pack"
     ]
 }

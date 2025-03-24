@@ -18,9 +18,12 @@ import {
   fromEvent,
   filter,
 } from 'rxjs';
-import { createEbmlController } from './media/mkv/reactive';
-import { TrackTypeRestrictionEnum, type ClusterType } from './media/mkv/schema';
-import type { SegmentComponent } from './media/mkv/model';
+import { createEbmlController } from '@konoplayer/matroska/reactive';
+import {
+  TrackTypeRestrictionEnum,
+  type ClusterType,
+} from '@konoplayer/matroska/schema';
+import type { SegmentComponent } from '@konoplayer/matroska/model';
 import { createRef, ref, type Ref } from 'lit/directives/ref.js';
 import { Queue } from 'mnemonist';
 
@@ -113,7 +116,6 @@ export class VideoPipelineDemo extends LitElement {
                 description: videoTrack.CodecPrivate, // Uint8Array，包含 VPS/SPS/PPS
               });
 
-              // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
               const sub = this.cluster$.subscribe((c) => {
                 if (!isFinalized) {
                   for (const b of (c.SimpleBlock || []).filter(
@@ -163,7 +165,7 @@ export class VideoPipelineDemo extends LitElement {
               const numberOfChannels =
                 (audioTrack.Audio?.Channels as number) || 2;
               const duration =
-                Math.round(Number(audioTrack.DefaultDuration / 1000)) ||
+                Math.round(Number(audioTrack.DefaultDuration) / 1000) ||
                 Math.round((1024 / sampleRate) * 1000000);
 
               decoder.configure({

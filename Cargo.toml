@@ -1,3 +1,3 @@
 [workspace]
-members = ["packages/demuxing", "packages/codecs"]
+members = ["packages/symphonia", "packages/ffmpeg"]
 resolver = "3"

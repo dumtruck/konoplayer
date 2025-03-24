@@ -1,5 +1,5 @@
 {
-    "name": "mock",
+    "name": "@konoplayer/mock",
     "version": "0.1.0",
     "private": true,
     "scripts": {

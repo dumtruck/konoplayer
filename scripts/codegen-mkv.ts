@@ -363,7 +363,6 @@ function generateMkvSchemaHierarchy(elements_: EbmlElementType[]) {
 
     const selfSchema = [
       `export const ${el.name}Schema = type({`,
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
       ...associated.map((v) => {
         let meta: any;
         const restriction = generateRestriction(v);

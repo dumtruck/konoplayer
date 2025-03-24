@@ -3,6 +3,10 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "./dist",
+    "types": [
+      "vitest/globals",
+      "node"
+    ],
     "paths": {
       "@konoplayer/core/*": [
         "../../packages/core/src/*"
