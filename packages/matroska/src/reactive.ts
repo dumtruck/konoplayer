@@ -10,12 +10,11 @@ import {
   filter,
   finalize,
   from,
-  isEmpty,
+  isEmpty, last,
   map,
   merge,
   Observable,
   of,
-  reduce,
   scan,
   share,
   shareReplay,
@@ -28,51 +27,33 @@ import {
   createRangedStream,
   type CreateRangedStreamOptions,
 } from '@konoplayer/core/data';
-import {
-  type CueSystem,
-  SEEK_ID_KAX_CUES,
-  SEEK_ID_KAX_TAGS,
-  type SegmentComponent,
-  SegmentSystem,
-} from './model';
 import { isTagIdPos, waitTick } from './util';
 import type { ClusterType } from './schema';
+import {SEEK_ID_KAX_CUES, SEEK_ID_KAX_TAGS, type CueSystem, type SegmentComponent, SegmentSystem} from "./systems";
 
 export interface CreateRangedEbmlStreamOptions
   extends CreateRangedStreamOptions {
-  tee?: boolean;
 }
 
 export function createRangedEbmlStream({
   url,
   byteStart = 0,
   byteEnd,
-  tee = false,
 }: CreateRangedEbmlStreamOptions): Observable<{
   ebml$: Observable<EbmlTagType>;
   totalSize?: number;
   response: Response;
   body: ReadableStream<Uint8Array>;
   controller: AbortController;
-  teeBody: ReadableStream<Uint8Array> | undefined;
 }> {
   const stream$ = from(createRangedStream({ url, byteStart, byteEnd }));
 
   return stream$.pipe(
     switchMap(({ controller, body, totalSize, response }) => {
       let requestCompleted = false;
-      let teeStream: ReadableStream<Uint8Array> | undefined;
-
-      let stream: ReadableStream<Uint8Array>;
-
-      if (tee) {
-        [stream, teeStream] = body.tee();
-      } else {
-        stream = body;
-      }
 
       const originRequest$ = new Observable<EbmlTagType>((subscriber) => {
-        stream
+        body
           .pipeThrough(
             new EbmlStreamDecoder({
               streamStartOffset: byteStart,
@@ -130,8 +111,7 @@ export function createRangedEbmlStream({
         ebml$,
         totalSize,
         response,
-        body: stream,
-        teeBody: teeStream,
+        body,
         controller,
       });
     })
@@ -149,11 +129,10 @@ export function createEbmlController({
     ...options,
     url,
     byteStart: 0,
-    tee: true,
   });
 
   const controller$ = metaRequest$.pipe(
-    map(({ totalSize, ebml$, response, controller, teeBody }) => {
+    map(({ totalSize, ebml$, response, controller }) => {
       const head$ = ebml$.pipe(
         filter(isTagIdPos(EbmlTagIdEnum.EBML, EbmlTagPosition.End)),
         take(1),
@@ -174,36 +153,23 @@ export function createEbmlController({
        */
       const segments$ = segmentStart$.pipe(
         map((startTag) => {
-          const segment = new SegmentSystem(startTag, teeBody!);
+          const segment = new SegmentSystem(startTag);
           const clusterSystem = segment.cluster;
           const seekSystem = segment.seek;
 
-          const meta$ = ebml$.pipe(
+          const metaScan$ = ebml$.pipe(
             scan(
               (acc, tag) => {
-                // avoid object recreation
-                acc.hasKeyframe =
-                  acc.hasKeyframe ||
-                  (tag.id === EbmlTagIdEnum.SimpleBlock && tag.keyframe) ||
-                  (tag.id === EbmlTagIdEnum.BlockGroup &&
-                    tag.children.every(
-                      (c) => c.id !== EbmlTagIdEnum.ReferenceBlock
-                    ));
+                acc.segment.scanMeta(tag);
                 acc.tag = tag;
                 return acc;
               },
-              { hasKeyframe: false, tag: undefined as unknown as EbmlTagType }
+              {
+                segment,
+                tag: undefined as unknown as EbmlTagType,
+              }
             ),
-            takeWhile(({ tag, hasKeyframe }) => {
-              return (
-                !isTagIdPos(EbmlTagIdEnum.Segment, EbmlTagPosition.End)(tag) &&
-                !(
-                  isTagIdPos(EbmlTagIdEnum.Cluster, EbmlTagPosition.End)(tag) &&
-                  hasKeyframe
-                )
-              );
-            }, true),
-            map(({ tag }) => tag),
+            takeWhile((acc) => acc.segment.canCompleteMeta(), true),
             share({
               resetOnComplete: false,
               resetOnError: false,
@@ -211,10 +177,13 @@ export function createEbmlController({
             })
           );
 
-          const withMeta$ = meta$.pipe(
-            reduce((segment, meta) => segment.scanMeta(meta), segment),
-            switchMap(() => segment.completeMeta()),
-            take(1),
+          const meta$ = metaScan$.pipe(
+            map(({ tag }) => tag)
+          );
+
+          const withMeta$ = metaScan$.pipe(
+            last(),
+            switchMap(({ segment }) => segment.completeMeta()),
             shareReplay(1)
           );
 

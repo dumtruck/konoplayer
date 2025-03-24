@@ -1,0 +1,14 @@
+export enum NetworkState {
+  NETWORK_EMPTY = 0,
+  NETWORK_IDLE = 1,
+  NETWORK_LOADING = 2,
+  NETWORK_NO_SOURCE = 3,
+}
+
+export enum ReadyState {
+  HAVE_NOTHING = 0,
+  HAVE_METADATA = 1,
+  HAVE_CURRENT_DATA = 2,
+  HAVE_FUTURE_DATA = 3,
+  HAVE_ENOUGH_DATA = 4
+}

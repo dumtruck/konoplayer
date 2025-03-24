@@ -1,4 +1,4 @@
-import { UnsupportedCodecError } from '@konoplayer/core/errors';
+import {ParseCodecError, UnsupportedCodecError} from '@konoplayer/core/errors';
 import { VideoCodec, AudioCodec } from '@konoplayer/core/codecs';
 import type { TrackEntryType } from '../schema';
 import {
@@ -19,7 +19,7 @@ import {
 } from './hevc.ts';
 import {
   genCodecStringByVP9DecoderConfigurationRecord,
-  parseVP9DecoderConfigurationRecord,
+  parseVP9DecoderConfigurationRecord, VP9_CODEC_TYPE,
 } from './vp9.ts';
 
 export const VideoCodecId = {
@@ -122,9 +122,13 @@ export interface VideoDecoderConfigExt extends VideoDecoderConfig {
   codecType: VideoCodec;
 }
 
+export function videoCodecIdRequirePeekingKeyframe(codecId: VideoCodecIdType) {
+  return codecId === VideoCodecId.VP9
+}
+
 export function videoCodecIdToWebCodecs(
   track: TrackEntryType,
-  keyframe: Uint8Array
+  keyframe: Uint8Array | undefined
 ): VideoDecoderConfigExt {
   const codecId = track.CodecID;
   const codecPrivate = track.CodecPrivate;
@@ -141,6 +145,9 @@ export function videoCodecIdToWebCodecs(
         ),
       };
     case VideoCodecId.VP9:
+      if (!keyframe) {
+        throw new ParseCodecError(VP9_CODEC_TYPE, 'keyframe is required to parse VP9 codec')
+      }
       return {
         ...shareOptions,
         codecType: VideoCodec.VP9,
@@ -195,8 +202,15 @@ export interface AudioDecoderConfigExt extends AudioDecoderConfig {
   codecType: AudioCodec;
 }
 
+export function isAudioCodecIdRequirePeekingKeyframe (
+  _track: TrackEntryType,
+) {
+  return false;
+}
+
 export function audioCodecIdToWebCodecs(
-  track: TrackEntryType
+  track: TrackEntryType,
+  _keyframe: Uint8Array | undefined
 ): AudioDecoderConfigExt {
   const codecId = track.CodecID;
   const codecPrivate = track.CodecPrivate;

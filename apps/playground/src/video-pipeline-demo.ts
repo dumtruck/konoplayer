@@ -15,17 +15,17 @@ import {
   take,
   tap,
   distinctUntilChanged,
-  fromEvent,
-  filter,
+  fromEvent, withLatestFrom, share, delay, delayWhen, from, of,
 } from 'rxjs';
 import { createEbmlController } from '@konoplayer/matroska/reactive';
 import {
   TrackTypeRestrictionEnum,
   type ClusterType,
 } from '@konoplayer/matroska/schema';
-import type { SegmentComponent } from '@konoplayer/matroska/model';
 import { createRef, ref, type Ref } from 'lit/directives/ref.js';
 import { Queue } from 'mnemonist';
+
+import type {SegmentComponent, AudioTrackContext, VideoTrackContext} from "@konoplayer/matroska/systems";
 
 export class VideoPipelineDemo extends LitElement {
   static styles = css``;
@@ -43,6 +43,7 @@ export class VideoPipelineDemo extends LitElement {
   audioContext = new AudioContext();
 
   seek$ = new ReplaySubject<number>(1);
+
   cluster$ = new Subject<SegmentComponent<ClusterType>>();
   videoFrameBuffer$ = new BehaviorSubject(new Queue<VideoFrame>());
   audioFrameBuffer$ = new BehaviorSubject(new Queue<AudioData>());
@@ -62,37 +63,47 @@ export class VideoPipelineDemo extends LitElement {
       url: src,
     });
 
-    const segment$ = controller$.pipe(
+    const segmentContext$ = controller$.pipe(
       switchMap(({ segments$ }) => segments$.pipe(take(1)))
     );
 
-    const cluster$ = combineLatest({
-      seekTime: this.seek$,
-      segment: segment$,
-    }).pipe(switchMap(({ seekTime, segment }) => segment.seek(seekTime)));
+    const videoTrack$ = segmentContext$.pipe(
 
-    const decode$ = segment$.pipe(
+    )
+
+    const currentCluster$ = combineLatest({
+      seekTime: this.seek$,
+      segmentContext: segmentContext$,
+    }).pipe(
+      delayWhen(({ segmentContext: { segment } }) => from(segment.track.flushContexts())),
+      switchMap(({ seekTime, segmentContext }) => combineLatest({
+        segmentContext: of(segmentContext),
+        cluster: segmentContext.seek(seekTime),
+      })),
+      share()
+    );
+
+    const decodeVideo$ = currentCluster$.pipe(
+
+    )
+
+    const decode$ = segmentContext$.pipe(
       switchMap(({ withMeta$ }) => withMeta$),
       map((segment) => {
         const trackSystem = segment.track;
         const infoSystem = segment.info;
-        const tracks = {
-          video: trackSystem.getTrackEntry({
-            predicate: (c) =>
-              c.TrackType === TrackTypeRestrictionEnum.VIDEO &&
-              c.FlagEnabled !== 0,
-          }),
-          audio: trackSystem.getTrackEntry({
+        const videoTrack = trackSystem.getTrackContext<VideoTrackContext>({
+          predicate: (c) =>
+            c.TrackType === TrackTypeRestrictionEnum.VIDEO &&
+            c.FlagEnabled !== 0,
+        });
+        const audioTrack = trackSystem.getTrackContext({
             predicate: (c) =>
               c.TrackType === TrackTypeRestrictionEnum.AUDIO &&
               c.FlagEnabled !== 0,
-          }),
-          subtitle: trackSystem.getTrackEntry({
-            predicate: (c) =>
-              c.TrackType === TrackTypeRestrictionEnum.SUBTITLE &&
-              c.FlagEnabled !== 0,
-          }),
-        };
+        });
+
+        const videoDecode$ = track
 
         const videoDecode$ = tracks.video
           ? new Observable<VideoFrame>((subscriber) => {
@@ -354,7 +365,7 @@ export class VideoPipelineDemo extends LitElement {
     this.pipeline$$.add(video$.subscribe());
     this.pipeline$$.add(addToVideoFrameBuffer$.subscribe());
     this.pipeline$$.add(addToAudioFrameBuffer$.subscribe());
-    this.pipeline$$.add(cluster$.subscribe(this.cluster$));
+    this.pipeline$$.add(currentCluster$.subscribe(this.cluster$));
     this.pipeline$$.add(
       fromEvent(document.body, 'click').subscribe(() => {
         this.audioContext.resume();
