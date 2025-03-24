@@ -1,5 +1,5 @@
 import { AudioCodec } from '../../base/audio_codecs';
-import { UnsupportCodecError } from '../../base/errors';
+import { UnsupportedCodecError } from '../../base/errors';
 import { VideoCodec } from '../../base/video_codecs';
 import type { TrackEntryType } from '../schema';
 import {
@@ -10,6 +10,7 @@ import {
   genCodecIdByAVCDecoderConfigurationRecord,
   parseAVCDecoderConfigurationRecord,
 } from './avc';
+import type {ProbeInfo} from "@/media/mkv/enhance/probe.ts";
 
 export const VideoCodecId = {
   VCM: 'V_MS/VFW/FOURCC',
@@ -107,123 +108,183 @@ export type SubtitleCodecIdType =
   | `${(typeof SubtitleCodecId)[keyof typeof SubtitleCodecId]}`
   | string;
 
-export function videoCodecIdToWebCodecsVideoDecoder(
-  track: TrackEntryType
-): [VideoCodec, string] {
+
+export interface VideoDecoderConfigExt extends VideoDecoderConfig {
+  codecType: VideoCodec,
+}
+
+export function videoCodecIdToWebCodecs(
+  track: TrackEntryType,
+  _probeInfo?: ProbeInfo
+): VideoDecoderConfigExt {
   const codecId = track.CodecID;
   const codecPrivate = track.CodecPrivate;
+  const shareOptions = {
+    description: codecPrivate
+  }
   switch (codecId) {
     case VideoCodecId.HEVC:
-      return [VideoCodec.HEVC, 'hevc'];
+      return { ...shareOptions, codecType: VideoCodec.HEVC, codec: 'hevc' };
     case VideoCodecId.VP9:
-      return [VideoCodec.VP9, 'vp09'];
+      return { ...shareOptions, codecType: VideoCodec.VP9, codec: 'vp09' };
     case VideoCodecId.AV1:
-      return [VideoCodec.AV1, 'av1'];
+      return { ...shareOptions, codecType: VideoCodec.AV1, codec: 'av1' };
     case VideoCodecId.H264:
       if (!codecPrivate) {
-        throw new UnsupportCodecError(
+        throw new UnsupportedCodecError(
           'h264(without codec_private profile)',
           'web codecs audio decoder'
         );
       }
-      return [
-        VideoCodec.H264,
-        genCodecIdByAVCDecoderConfigurationRecord(
+      return {
+        ...shareOptions,
+        codecType: VideoCodec.H264,
+        codec: genCodecIdByAVCDecoderConfigurationRecord(
           parseAVCDecoderConfigurationRecord(codecPrivate)
-        ),
-      ];
+         )
+      };
     case VideoCodecId.THEORA:
-      return [VideoCodec.Theora, 'theora'];
+      return { ...shareOptions, codecType: VideoCodec.Theora, codec: 'theora' };
     case VideoCodecId.VP8:
-      return [VideoCodec.VP8, 'vp8'];
+      return { ...shareOptions, codecType: VideoCodec.VP8, codec: 'vp8' };
     case VideoCodecId.MPEG4_ISO_SP:
-      return [VideoCodec.MPEG4, 'mp4v.01.3'];
+      return { ...shareOptions, codecType: VideoCodec.MPEG4, codec: 'mp4v.01.3' };
     case VideoCodecId.MPEG4_ISO_ASP:
-      return [VideoCodec.MPEG4, 'mp4v.20.9'];
+      return { ...shareOptions, codecType: VideoCodec.MPEG4, codec: 'mp4v.20.9' };
     case VideoCodecId.MPEG4_ISO_AP:
-      return [VideoCodec.MPEG4, 'mp4v.20.9'];
+      return { ...shareOptions, codecType: VideoCodec.MPEG4, codec: 'mp4v.20.9' };
     default:
-      throw new UnsupportCodecError(codecId, 'web codecs video decoder');
+      throw new UnsupportedCodecError(codecId, 'web codecs video decoder');
   }
 }
 
-export function videoCodecIdToWebCodecsAudioDecoder(
-  track: TrackEntryType
-): [AudioCodec, string] {
+export interface AudioDecoderConfigExt extends AudioDecoderConfig {
+  codecType: AudioCodec,
+}
+
+export function audioCodecIdToWebCodecs(
+  track: TrackEntryType,
+  _probeInfo?: ProbeInfo
+): AudioDecoderConfigExt {
   const codecId = track.CodecID;
   const codecPrivate = track.CodecPrivate;
   const bitDepth = track.Audio?.BitDepth;
+  const numberOfChannels = Number(track.Audio?.Channels);
+  const sampleRate = Number(track.Audio?.SamplingFrequency);
+
+  const shareOptions = {
+    numberOfChannels,
+    sampleRate,
+    description: codecPrivate
+  }
+
   switch (track.CodecID) {
     case AudioCodecId.AAC_MPEG4_MAIN:
     case AudioCodecId.AAC_MPEG2_MAIN:
-      return [AudioCodec.AAC, 'mp4a.40.1'];
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.AAC,
+        codec: 'mp4a.40.1'
+      };
     case AudioCodecId.AAC_MPEG2_LC:
     case AudioCodecId.AAC_MPEG4_LC:
-      return [AudioCodec.AAC, 'mp4a.40.2'];
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.AAC,
+        codec: 'mp4a.40.2'
+      };
     case AudioCodecId.AAC_MPEG2_SSR:
     case AudioCodecId.AAC_MPEG4_SSR:
-      return [AudioCodec.AAC, 'mp4a.40.3'];
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.AAC,
+        codec: 'mp4a.40.3'
+      };
     case AudioCodecId.AAC_MPEG4_LTP:
-      return [AudioCodec.AAC, 'mp4a.40.4'];
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.AAC,
+        codec: 'mp4a.40.4'
+      };
     case AudioCodecId.AAC_MPEG2_LC_SBR:
     case AudioCodecId.AAC_MPEG4_SBR:
-      return [AudioCodec.AAC, 'mp4a.40.5'];
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.AAC,
+        codec: 'mp4a.40.5'
+      };
     case AudioCodecId.AAC:
-      return [
-        AudioCodec.AAC,
-        codecPrivate
-          ? genCodecIdByAudioSpecificConfig(
-              parseAudioSpecificConfig(codecPrivate)
-            )
-          : 'mp4a.40.2',
-      ];
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.AAC,
+        codec: codecPrivate
+        ? genCodecIdByAudioSpecificConfig(
+          parseAudioSpecificConfig(codecPrivate)
+        ) : 'mp4a.40.2',
+      };
     case AudioCodecId.AC3:
     case AudioCodecId.AC3_BSID9:
-      return [AudioCodec.AC3, 'ac-3'];
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.AC3,
+        codec: 'ac-3'
+      };
     case AudioCodecId.EAC3:
     case AudioCodecId.AC3_BSID10:
-      return [AudioCodec.EAC3, 'ec-3'];
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.EAC3,
+        codec: 'ec-3'
+      };
     case AudioCodecId.MPEG_L3:
-      return [AudioCodec.MP3, 'mp3'];
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.MP3,
+        codec: 'mp3'
+      };
     case AudioCodecId.VORBIS:
-      return [AudioCodec.Vorbis, 'vorbis'];
+      return { ...shareOptions, codecType: AudioCodec.Vorbis, codec: 'vorbis' }
+;
     case AudioCodecId.FLAC:
-      return [AudioCodec.FLAC, 'flac'];
+      return { ...shareOptions, codecType: AudioCodec.FLAC, codec: 'flac' }
+;
     case AudioCodecId.OPUS:
-      return [AudioCodec.Opus, 'opus'];
+      return { ...shareOptions, codecType: AudioCodec.Opus, codec: 'opus' }
+;
     case AudioCodecId.ALAC:
-      return [AudioCodec.ALAC, 'alac'];
+      return { ...shareOptions, codecType: AudioCodec.ALAC, codec: 'alac' }
+;
     case AudioCodecId.PCM_INT_BIG:
       if (bitDepth === 16) {
-        return [AudioCodec.PCM_S16BE, 'pcm-s16be'];
+        return { ...shareOptions, codecType: AudioCodec.PCM_S16BE, codec: 'pcm-s16be' };
       }
       if (bitDepth === 24) {
-        return [AudioCodec.PCM_S24BE, 'pcm-s24be'];
+        return { ...shareOptions, codecType: AudioCodec.PCM_S24BE, codec: 'pcm-s24be' };
       }
       if (bitDepth === 32) {
-        return [AudioCodec.PCM_S32BE, 'pcm-s32be'];
+        return { ...shareOptions, codecType: AudioCodec.PCM_S32BE, codec: 'pcm-s32be' };
       }
-      throw new UnsupportCodecError(
+      throw new UnsupportedCodecError(
         `${codecId}(${bitDepth}b)`,
         'web codecs audio decoder'
       );
     case AudioCodecId.PCM_INT_LIT:
       if (bitDepth === 16) {
-        return [AudioCodec.PCM_S16LE, 'pcm-s16le'];
+        return { ...shareOptions, codecType: AudioCodec.PCM_S16LE, codec: 'pcm-s16le' };
       }
       if (bitDepth === 24) {
-        return [AudioCodec.PCM_S24LE, 'pcm-s24le'];
+        return { ...shareOptions, codecType: AudioCodec.PCM_S24LE, codec: 'pcm-s24le' };
       }
       if (bitDepth === 32) {
-        return [AudioCodec.PCM_S32LE, 'pcm-s32le'];
+        return { ...shareOptions, codecType: AudioCodec.PCM_S32LE, codec: 'pcm-s32le' };
       }
-      throw new UnsupportCodecError(
+      throw new UnsupportedCodecError(
         `${codecId}(${bitDepth}b)`,
         'web codecs audio decoder'
       );
     case AudioCodecId.PCM_FLOAT_IEEE:
-      return [AudioCodec.PCM_F32LE, 'pcm-f32le'];
+      return { ...shareOptions, codecType: AudioCodec.PCM_F32LE, codec: 'pcm-f32le' };
     default:
-      throw new UnsupportCodecError(codecId, 'web codecs audio decoder');
+      throw new UnsupportedCodecError(codecId, 'web codecs audio decoder');
   }
 }

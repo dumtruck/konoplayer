@@ -23,7 +23,6 @@ import { TrackTypeRestrictionEnum, type ClusterType } from './media/mkv/schema';
 import type { SegmentComponent } from './media/mkv/model';
 import { createRef, ref, type Ref } from 'lit/directives/ref.js';
 import { Queue } from 'mnemonist';
-import { dataViewSliceToBuf } from 'konoebml';
 
 export class VideoPipelineDemo extends LitElement {
   static styles = css``;
@@ -45,7 +44,6 @@ export class VideoPipelineDemo extends LitElement {
   videoFrameBuffer$ = new BehaviorSubject(new Queue<VideoFrame>());
   audioFrameBuffer$ = new BehaviorSubject(new Queue<AudioData>());
   pipeline$$?: Subscription;
-  bridge$$?: Subscription;
   private startTime = 0;
 
   paused$ = new BehaviorSubject<boolean>(false);

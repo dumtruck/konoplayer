@@ -30,8 +30,14 @@ import {
   TagSchema,
   type TagType,
   TrackEntrySchema,
-  type TrackEntryType,
+  type TrackEntryType, TrackTypeRestrictionEnum,
 } from './schema';
+import {concatBufs} from "konoebml/lib/tools";
+import {ParseCodecErrors, UnreachableOrLogicError, UnsupportedCodecError} from "@/media/base/errors.ts";
+import type {ProbeInfo} from "@/media/mkv/enhance/probe.ts";
+import {audioCodecIdToWebCodecs, videoCodecIdToWebCodecs} from "@/media/mkv/codecs";
+import {Queue} from "mnemonist";
+import {BehaviorSubject} from "rxjs";
 
 export const SEEK_ID_KAX_INFO = new Uint8Array([0x15, 0x49, 0xa9, 0x66]);
 export const SEEK_ID_KAX_TRACKS = new Uint8Array([0x16, 0x54, 0xae, 0x6b]);
@@ -41,6 +47,10 @@ export const SEEK_ID_KAX_TAGS = new Uint8Array([0x12, 0x54, 0xc3, 0x67]);
 export class SegmentSystem {
   startTag: EbmlSegmentTagType;
   headTags: EbmlTagType[] = [];
+  teeStream: ReadableStream<Uint8Array>
+  teeBufferTask: Promise<Uint8Array>;
+  firstCluster: EbmlClusterTagType | undefined;
+  probInfo?: ProbeInfo;
 
   cue: CueSystem;
   cluster: ClusterSystem;
@@ -49,7 +59,7 @@ export class SegmentSystem {
   track: TrackSystem;
   tag: TagSystem;
 
-  constructor(startNode: EbmlSegmentTagType) {
+  constructor(startNode: EbmlSegmentTagType, teeStream: ReadableStream<Uint8Array>) {
     this.startTag = startNode;
     this.cue = new CueSystem(this);
     this.cluster = new ClusterSystem(this);
@@ -57,17 +67,35 @@ export class SegmentSystem {
     this.info = new InfoSystem(this);
     this.track = new TrackSystem(this);
     this.tag = new TagSystem(this);
+    this.teeStream = teeStream;
+    this.teeBufferTask = this.teeWaitingProbingData(teeStream);
+  }
+
+  private async teeWaitingProbingData (teeStream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+    const reader = teeStream.getReader();
+    const list: Uint8Array<ArrayBufferLike>[] = [];
+    while (true) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        list.push(value);
+      } catch (e: any) {
+        if (e?.name === 'AbortError') {
+          break;
+        }
+        throw e;
+      }
+    }
+    return concatBufs(...list)
   }
 
   get contentStartOffset() {
     return this.startTag.startOffset + this.startTag.headerLength;
   }
 
-  get startOffset() {
-    return this.startTag.startOffset;
-  }
-
-  completeHeads() {
+  private seekLocal () {
     const infoTag = this.seek.seekTagBySeekId(SEEK_ID_KAX_INFO);
     const tracksTag = this.seek.seekTagBySeekId(SEEK_ID_KAX_TRACKS);
     const cuesTag = this.seek.seekTagBySeekId(SEEK_ID_KAX_CUES);
@@ -83,13 +111,11 @@ export class SegmentSystem {
       this.track.prepareTracksWithTag(tracksTag);
     }
     if (tagsTag?.id === EbmlTagIdEnum.Tags) {
-      this.tag.prepareTagsWIthTag(tagsTag);
+      this.tag.prepareTagsWithTag(tagsTag);
     }
-
-    return this;
   }
 
-  scanHead(tag: EbmlTagType) {
+  scanMeta(tag: EbmlTagType) {
     if (
       tag.id === EbmlTagIdEnum.SeekHead &&
       tag.position === EbmlTagPosition.End
@@ -98,7 +124,61 @@ export class SegmentSystem {
     }
     this.headTags.push(tag);
     this.seek.memoTag(tag);
+    if (tag.id === EbmlTagIdEnum.Cluster && !this.firstCluster) {
+      this.firstCluster = tag;
+      this.seekLocal();
+    }
     return this;
+  }
+
+  async completeMeta () {
+    this.seekLocal();
+
+    await this.parseCodes();
+
+    return this;
+  }
+
+  async fetchProbeInfo (_payload: Uint8Array): Promise<ProbeInfo> {
+    // call local or remote ff-probe
+    return {}
+  }
+
+  async parseCodes () {
+    const candidates = this.track.tracks.filter(c => c.TrackType === TrackTypeRestrictionEnum.AUDIO || c.TrackType === TrackTypeRestrictionEnum.VIDEO);
+    const parseErrors = new ParseCodecErrors();
+
+    if (!this.probInfo) {
+      for (const t of candidates) {
+        try {
+          await this.track.initTrack(t, undefined)
+        } catch (e: unknown) {
+          parseErrors.cause.push(e as Error)
+        }
+      }
+      if (parseErrors.cause.length > 0) {
+        try {
+          const teeBuffer = await this.teeBufferTask;
+          this.probInfo = await this.fetchProbeInfo(teeBuffer);
+        } catch (e) {
+          parseErrors.cause.push(e as Error);
+          return;
+        }
+      } else {
+        return;
+      }
+    }
+
+    for (const t of candidates) {
+      try {
+        await this.track.initTrack(t, this.probInfo)
+      } catch (e) {
+        parseErrors.cause.push(e as Error)
+      }
+    }
+    if (parseErrors.cause.length > 0) {
+      console.error(parseErrors);
+    }
   }
 }
 
@@ -157,7 +237,7 @@ export class SeekSystem extends SegmentComponentSystemTrait<
   }
 
   seekHeads: SeekHeadType[] = [];
-  offsetToTagMemo: Map<number, EbmlTagType> = new Map();
+  private offsetToTagMemo: Map<number, EbmlTagType> = new Map();
 
   memoTag(tag: EbmlTagType) {
     this.offsetToTagMemo.set(tag.startOffset, tag);
@@ -192,6 +272,13 @@ export class SeekSystem extends SegmentComponentSystemTrait<
 
   seekTagBySeekId(seekId: Uint8Array): EbmlTagType | undefined {
     return this.seekTagByStartOffset(this.seekOffsetBySeekId(seekId));
+  }
+
+  get firstClusterOffset () {
+    if (!this.segment.firstCluster) {
+      throw new UnreachableOrLogicError("first cluster not found")
+    }
+    return this.segment.firstCluster.startOffset;
   }
 }
 
@@ -228,6 +315,18 @@ export class ClusterSystem extends SegmentComponentSystemTrait<
   }
 }
 
+export interface GetTrackEntryOptions {
+  priority?: (v: SegmentComponent<TrackEntryType>) => number;
+  predicate?: (v: SegmentComponent<TrackEntryType>) => boolean;
+}
+
+
+export interface TrackState<Decoder, Config, Frame> {
+  decoder: Decoder,
+  configuration?: Config,
+  frameBuffer$: BehaviorSubject<Queue<Frame>>
+}
+
 export class TrackSystem extends SegmentComponentSystemTrait<
   EbmlTrackEntryTagType,
   typeof TrackEntrySchema
@@ -237,15 +336,14 @@ export class TrackSystem extends SegmentComponentSystemTrait<
   }
 
   tracks: SegmentComponent<TrackEntryType>[] = [];
+  videoTrackState = new WeakMap<TrackEntryType, TrackState< VideoDecoder, VideoDecoderConfig, VideoFrame>>();
+  audioTrackState = new WeakMap<TrackEntryType, TrackState<AudioDecoder, AudioDecoderConfig, AudioData>>();
 
   getTrackEntry({
     priority = (track) =>
       (Number(!!track.FlagForced) << 4) + Number(!!track.FlagDefault),
     predicate = (track) => track.FlagEnabled !== 0,
-  }: {
-    priority?: (v: SegmentComponent<TrackEntryType>) => number;
-    predicate?: (v: SegmentComponent<TrackEntryType>) => boolean;
-  }) {
+  }: GetTrackEntryOptions) {
     return this.tracks
       .filter(predicate)
       .toSorted((a, b) => priority(b) - priority(a))
@@ -257,6 +355,52 @@ export class TrackSystem extends SegmentComponentSystemTrait<
       .filter((c) => c.id === EbmlTagIdEnum.TrackEntry)
       .map((c) => this.componentFromTag(c));
     return this;
+  }
+
+  async initTrack (track: TrackEntryType, probe?: ProbeInfo)  {
+    if (track.TrackType === TrackTypeRestrictionEnum.AUDIO) {
+      const configuration = audioCodecIdToWebCodecs(track, probe);
+      if (await AudioDecoder.isConfigSupported(configuration)) {
+        throw new UnsupportedCodecError(configuration.codec, 'audio decoder')
+      }
+
+      const queue$ = new BehaviorSubject(new Queue<AudioData>());
+      this.audioTrackState.set(track, {
+        configuration,
+        decoder: new AudioDecoder({
+          output: (audioData) => {
+            const queue = queue$.getValue();
+            queue.enqueue(audioData);
+            queue$.next(queue);
+          },
+          error: (e) => {
+            queue$.error(e);
+          },
+        }),
+        frameBuffer$: queue$,
+      })
+    } else if (track.TrackType === TrackTypeRestrictionEnum.VIDEO) {
+      const configuration = videoCodecIdToWebCodecs(track, probe);
+      if (await VideoDecoder.isConfigSupported(configuration)) {
+        throw new UnsupportedCodecError(configuration.codec, 'audio decoder')
+      }
+
+      const queue$ = new BehaviorSubject(new Queue<VideoFrame>());
+      this.videoTrackState.set(track, {
+        configuration,
+        decoder: new VideoDecoder({
+          output: (audioData) => {
+            const queue = queue$.getValue();
+            queue.enqueue(audioData);
+            queue$.next(queue);
+          },
+          error: (e) => {
+            queue$.error(e);
+          },
+        }),
+        frameBuffer$: queue$,
+      })
+    }
   }
 }
 
@@ -350,7 +494,7 @@ export class TagSystem extends SegmentComponentSystemTrait<
 
   tags: SegmentComponent<TagType>[] = [];
 
-  prepareWithTagsTag(tag: EbmlTagsTagType) {
+  prepareTagsWithTag(tag: EbmlTagsTagType) {
     this.tags = tag.children
       .filter((c) => c.id === EbmlTagIdEnum.Tag)
       .map((c) => this.componentFromTag(c));

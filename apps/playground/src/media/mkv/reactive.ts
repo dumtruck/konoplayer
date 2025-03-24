@@ -1,62 +1,64 @@
+import {EbmlStreamDecoder, EbmlTagIdEnum, EbmlTagPosition, type EbmlTagType,} from 'konoebml';
 import {
-  type EbmlTagType,
-  EbmlStreamDecoder,
-  EbmlTagIdEnum,
-  EbmlTagPosition,
-} from 'konoebml';
-import {
-  Observable,
-  from,
-  switchMap,
-  share,
   defer,
   EMPTY,
-  of,
   filter,
   finalize,
+  from,
   isEmpty,
   map,
   merge,
-  raceWith,
+  Observable,
+  of,
   reduce,
   scan,
+  share,
   shareReplay,
+  switchMap,
   take,
-  takeUntil,
+  takeWhile,
   withLatestFrom,
 } from 'rxjs';
-import { createRangedStream, type CreateRangedStreamOptions } from '@/fetch';
-import {
-  SegmentSystem,
-  SEEK_ID_KAX_CUES,
-  type CueSystem,
-  type SegmentComponent,
-  SEEK_ID_KAX_TAGS,
-} from './model';
-import { isTagIdPos, waitTick } from './util';
-import type { ClusterType } from './schema';
+import {createRangedStream, type CreateRangedStreamOptions} from '@/fetch';
+import {type CueSystem, SEEK_ID_KAX_CUES, SEEK_ID_KAX_TAGS, type SegmentComponent, SegmentSystem,} from './model';
+import {isTagIdPos, waitTick} from './util';
+import type {ClusterType} from './schema';
 
 export interface CreateRangedEbmlStreamOptions
-  extends CreateRangedStreamOptions {}
+  extends CreateRangedStreamOptions {
+  tee?: boolean;
+}
 
 export function createRangedEbmlStream({
   url,
   byteStart = 0,
   byteEnd,
+  tee = false
 }: CreateRangedEbmlStreamOptions): Observable<{
   ebml$: Observable<EbmlTagType>;
   totalSize?: number;
   response: Response;
   body: ReadableStream<Uint8Array>;
   controller: AbortController;
+  teeBody: ReadableStream<Uint8Array> | undefined;
 }> {
   const stream$ = from(createRangedStream({ url, byteStart, byteEnd }));
 
   return stream$.pipe(
     switchMap(({ controller, body, totalSize, response }) => {
       let requestCompleted = false;
+      let teeStream: ReadableStream<Uint8Array> | undefined;
+
+      let stream: ReadableStream<Uint8Array>;
+
+      if (tee) {
+        [stream, teeStream] = body.tee();
+      } else {
+        stream = body;
+      }
+
       const originRequest$ = new Observable<EbmlTagType>((subscriber) => {
-        body
+        stream
           .pipeThrough(
             new EbmlStreamDecoder({
               streamStartOffset: byteStart,
@@ -114,7 +116,8 @@ export function createRangedEbmlStream({
         ebml$,
         totalSize,
         response,
-        body,
+        body: stream,
+        teeBody: teeStream,
         controller,
       });
     })
@@ -128,14 +131,16 @@ export function createEbmlController({
   url,
   ...options
 }: CreateEbmlControllerOptions) {
-  const request$ = createRangedEbmlStream({
+  const metaRequest$ = createRangedEbmlStream({
     ...options,
     url,
     byteStart: 0,
+    tee: true
   });
 
-  const controller$ = request$.pipe(
-    map(({ totalSize, ebml$, response, controller }) => {
+  const controller$ = metaRequest$.pipe(
+    map(({ totalSize, ebml$, response, controller, teeBody }) => {
+
       const head$ = ebml$.pipe(
         filter(isTagIdPos(EbmlTagIdEnum.EBML, EbmlTagPosition.End)),
         take(1),
@@ -147,8 +152,7 @@ export function createEbmlController({
       );
 
       const segmentStart$ = ebml$.pipe(
-        filter((s) => s.position === EbmlTagPosition.Start),
-        filter((tag) => tag.id === EbmlTagIdEnum.Segment)
+        filter(isTagIdPos(EbmlTagIdEnum.Segment, EbmlTagPosition.Start))
       );
 
       /**
@@ -157,24 +161,24 @@ export function createEbmlController({
        */
       const segments$ = segmentStart$.pipe(
         map((startTag) => {
-          const segment = new SegmentSystem(startTag);
+          const segment = new SegmentSystem(startTag, teeBody!);
           const clusterSystem = segment.cluster;
           const seekSystem = segment.seek;
 
-          const segmentEnd$ = ebml$.pipe(
-            filter(isTagIdPos(EbmlTagIdEnum.Segment, EbmlTagPosition.End)),
-            filter((tag) => tag.id === EbmlTagIdEnum.Segment),
-            take(1)
-          );
-
-          const clusterStart$ = ebml$.pipe(
-            filter(isTagIdPos(EbmlTagIdEnum.Cluster, EbmlTagPosition.Start)),
-            take(1),
-            shareReplay(1)
-          );
-
           const meta$ = ebml$.pipe(
-            takeUntil(clusterStart$.pipe(raceWith(segmentEnd$))),
+            scan((acc, tag) => {
+              // avoid object recreation
+              acc.hasKeyframe = acc.hasKeyframe || (tag.id === EbmlTagIdEnum.SimpleBlock && tag.keyframe) || (tag.id === EbmlTagIdEnum.BlockGroup && tag.children.every(c => c.id !== EbmlTagIdEnum.ReferenceBlock));
+              acc.tag = tag;
+              return acc;
+            }, { hasKeyframe: false, tag: undefined as unknown as EbmlTagType }),
+            takeWhile(
+              ({ tag, hasKeyframe }) => {
+                return !isTagIdPos(EbmlTagIdEnum.Segment, EbmlTagPosition.End)(tag) && !(isTagIdPos(EbmlTagIdEnum.Cluster, EbmlTagPosition.End)(tag) && hasKeyframe);
+              },
+              true
+            ),
+            map(({ tag }) => tag),
             share({
               resetOnComplete: false,
               resetOnError: false,
@@ -183,8 +187,8 @@ export function createEbmlController({
           );
 
           const withMeta$ = meta$.pipe(
-            reduce((segment, meta) => segment.scanHead(meta), segment),
-            map(segment.completeHeads.bind(segment)),
+            reduce((segment, meta) => segment.scanMeta(meta), segment),
+            switchMap(() => segment.completeMeta()),
             take(1),
             shareReplay(1)
           );
@@ -231,6 +235,7 @@ export function createEbmlController({
               if (tagSystem.prepared) {
                 return EMPTY;
               }
+
               const remoteTagsTagStartOffset =
                 seekSystem.seekOffsetBySeekId(SEEK_ID_KAX_TAGS);
               if (remoteTagsTagStartOffset! >= 0) {
@@ -243,7 +248,7 @@ export function createEbmlController({
                   filter(isTagIdPos(EbmlTagIdEnum.Tags, EbmlTagPosition.End)),
                   withLatestFrom(withMeta$),
                   map(([tags, withMeta]) => {
-                    withMeta.tag.prepareWithTagsTag(tags);
+                    withMeta.tag.prepareTagsWithTag(tags);
                     return withMeta;
                   })
                 );
@@ -280,12 +285,12 @@ export function createEbmlController({
           const seekWithoutCues = (
             seekTime: number
           ): Observable<SegmentComponent<ClusterType>> => {
-            const request$ = clusterStart$.pipe(
-              switchMap((startTag) =>
+            const request$ = withMeta$.pipe(
+              switchMap(() =>
                 createRangedEbmlStream({
                   ...options,
                   url,
-                  byteStart: startTag.startOffset,
+                  byteStart: seekSystem.firstClusterOffset,
                 })
               )
             );
@@ -301,18 +306,16 @@ export function createEbmlController({
 
             return cluster$.pipe(
               scan(
-                (prev, curr) =>
-                  [prev?.[1], curr] as [
-                    SegmentComponent<ClusterType> | undefined,
-                    SegmentComponent<ClusterType> | undefined,
-                  ],
-                [undefined, undefined] as [
-                  SegmentComponent<ClusterType> | undefined,
-                  SegmentComponent<ClusterType> | undefined,
-                ]
+                (acc, curr) => {
+                  // avoid object recreation
+                  acc.prev = acc.next;
+                  acc.next = curr;
+                  return acc;
+                },
+                ({ prev: undefined as (SegmentComponent<ClusterType> | undefined), next: undefined as SegmentComponent<ClusterType> | undefined })
               ),
-              filter((c) => c[1]?.Timestamp! > seekTime),
-              map((c) => c[0] ?? c[1]!)
+              filter((c) => c.next?.Timestamp! > seekTime),
+              map((c) => c.prev ?? c.next!)
             );
           };
 
@@ -394,6 +397,6 @@ export function createEbmlController({
 
   return {
     controller$,
-    request$,
+    request$: metaRequest$,
   };
 }
