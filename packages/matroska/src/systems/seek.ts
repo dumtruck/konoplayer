@@ -1,9 +1,8 @@
 import type {EbmlSeekHeadTagType, EbmlTagType} from "konoebml";
-import {SeekHeadSchema, type SeekHeadType} from "../schema.ts";
+import {SeekHeadSchema, type SeekHeadType} from "../schema";
 import {isEqual} from "lodash-es";
-import {UnreachableOrLogicError} from "@konoplayer/core/errors.ts";
-
-import {SegmentComponentSystemTrait} from "./segment.ts";
+import {UnreachableOrLogicError} from "@konoplayer/core/errors";
+import {SegmentComponentSystemTrait} from "./segment-component";
 
 export const SEEK_ID_KAX_INFO = new Uint8Array([0x15, 0x49, 0xa9, 0x66]);
 export const SEEK_ID_KAX_TRACKS = new Uint8Array([0x16, 0x54, 0xae, 0x6b]);

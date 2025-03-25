@@ -5,9 +5,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   cacheDir: '.vitest',
   test: {
-    setupFiles: ['src/init-test.ts'],
+    setupFiles: ['src/init-test'],
     environment: 'happy-dom',
-    include: ['src/**/*.spec.ts'],
+    include: ['src/**/*.spec'],
     globals: true,
     restoreMocks: true,
     coverage: {

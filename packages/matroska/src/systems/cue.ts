@@ -1,7 +1,8 @@
 import {type EbmlCuePointTagType, type EbmlCuesTagType, EbmlTagIdEnum} from "konoebml";
-import {CuePointSchema, type CuePointType, type CueTrackPositionsType} from "../schema.ts";
+import {CuePointSchema, type CuePointType, type CueTrackPositionsType} from "../schema";
 import {maxBy} from "lodash-es";
-import {type SegmentComponent, SegmentComponentSystemTrait} from "./segment.ts";
+import type {SegmentComponent} from "./segment";
+import {SegmentComponentSystemTrait} from "./segment-component";
 
 export class CueSystem extends SegmentComponentSystemTrait<
   EbmlCuePointTagType,

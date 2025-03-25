@@ -3,14 +3,18 @@ import {
   createRangedStream,
 } from '@konoplayer/core/data';
 import { type EbmlTagType, EbmlStreamDecoder, EbmlTagIdEnum } from 'konoebml';
-import { Observable, from, switchMap, share, defer, EMPTY, of } from 'rxjs';
+import {Observable, from, switchMap, share, defer, EMPTY, of, tap} from 'rxjs';
 import { waitTick } from '../util';
+
+export interface CreateRangedEbmlStreamOptions extends CreateRangedStreamOptions {
+  refCount?: boolean
+}
 
 export function createRangedEbmlStream({
   url,
   byteStart = 0,
-  byteEnd,
-}: CreateRangedStreamOptions): Observable<{
+  byteEnd
+}: CreateRangedEbmlStreamOptions): Observable<{
   ebml$: Observable<EbmlTagType>;
   totalSize?: number;
   response: Response;
@@ -23,7 +27,10 @@ export function createRangedEbmlStream({
     switchMap(({ controller, body, totalSize, response }) => {
       let requestCompleted = false;
 
-      const originRequest$ = new Observable<EbmlTagType>((subscriber) => {
+      const ebml$ = new Observable<EbmlTagType>((subscriber) => {
+        if (requestCompleted) {
+          subscriber.complete();
+        }
         body
           .pipeThrough(
             new EbmlStreamDecoder({
@@ -57,8 +64,10 @@ export function createRangedEbmlStream({
           });
 
         return () => {
-          requestCompleted = true;
-          controller.abort();
+          if (!requestCompleted) {
+            requestCompleted = true;
+            controller.abort();
+          }
         };
       }).pipe(
         share({
@@ -68,22 +77,12 @@ export function createRangedEbmlStream({
         })
       );
 
-      const ebml$ = defer(() =>
-        requestCompleted ? EMPTY : originRequest$
-      ).pipe(
-        share({
-          resetOnError: false,
-          resetOnComplete: true,
-          resetOnRefCountZero: true,
-        })
-      );
-
       return of({
-        ebml$,
         totalSize,
         response,
         body,
         controller,
+        ebml$
       });
     })
   );

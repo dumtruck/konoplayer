@@ -1,4 +1,4 @@
-import { Observable } from 'rxjs';
+import {map, Observable, Subject} from 'rxjs';
 
 export type RenderingContext =
   | ImageBitmapRenderingContext
@@ -42,18 +42,19 @@ export function captureCanvasAsVideoSrcObject(
   video.srcObject = canvas.captureStream(frameRate);
 }
 
-export function createVideoDecodeStream(configuration: VideoDecoderConfig): {
+export function createVideoDecodeStream(configuration: VideoDecoderConfig): Observable<{
   decoder: VideoDecoder;
   frame$: Observable<VideoFrame>;
-} {
-  let decoder!: VideoDecoder;
-  const frame$ = new Observable<VideoFrame>((subscriber) => {
+}> {
+  const frame$ = new Subject<VideoFrame>()
+  const decoder$ = new Observable<VideoDecoder>((subscriber) => {
     let isFinalized = false;
-    decoder = new VideoDecoder({
-      output: (frame) => subscriber.next(frame),
+    const decoder = new VideoDecoder({
+      output: (frame) => frame$.next(frame),
       error: (e) => {
         if (!isFinalized) {
           isFinalized = true;
+          frame$.error(e);
           subscriber.error(e);
         }
       },
@@ -61,16 +62,19 @@ export function createVideoDecodeStream(configuration: VideoDecoderConfig): {
 
     decoder.configure(configuration);
 
+    subscriber.next(decoder);
+
     return () => {
       if (!isFinalized) {
         isFinalized = true;
+        frame$.complete();
         decoder.close();
       }
     };
-  });
+  })
 
-  return {
+  return decoder$.pipe(map((decoder) => ({
     decoder,
-    frame$,
-  };
+    frame$
+  })));
 }

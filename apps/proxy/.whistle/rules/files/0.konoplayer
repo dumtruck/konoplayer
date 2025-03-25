@@ -5,7 +5,7 @@
 }
 ```
 
-^https://konoplayer.com/api/static/*** resSpeed://10240
+#^https://konoplayer.com/api/static/*** resSpeed://10240+
 ^https://konoplayer.com/api*** reqHeaders://{x-forwarded.json} http://127.0.0.1:5001/api$1
-^https://konoplayer.com/*** reqHeaders://{x-forwarded.json} http://127.0.0.1:5000/$1 excludeFilter://^https://konoplayer.com/api
+^https://konoplayer.com/*** reqHeaders://{x-forwarded.json} http://127.0.0.1:5000/$1 excludeFilter://^https://konoplayer.com/api weinre://test
 ^wss://konoplayer.com/*** reqHeaders://{x-forwarded.json} ws://127.0.0.1:5000/$1 excludeFilter://^wss://konoplayer.com/api

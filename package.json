@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "description": "A strange player, like the dumtruck, taking you to Isekai.",
   "scripts": {
-    "codegen-mkv": "tsx --tsconfig=./tsconfig.scripts.json ./scripts/codegen-mkv.ts",
-    "download-samples": "tsx --tsconfig=./tsconfig.scripts.json ./scripts/download-samples.ts"
+    "codegen-mkv": "tsx --tsconfig=./tsconfig.scripts.json ./scripts/codegen-mkv",
+    "download-samples": "tsx --tsconfig=./tsconfig.scripts.json ./scripts/download-samples"
   },
   "keywords": [],
   "author": "lonelyhentxi",

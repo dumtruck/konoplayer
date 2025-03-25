@@ -1,18 +1,20 @@
-import { Observable } from 'rxjs';
+import {map, Observable, Subject} from 'rxjs';
+
 
 // biome-ignore lint/correctness/noUndeclaredVariables: <explanation>
-export function createAudioDecodeStream(configuration: AudioDecoderConfig): {
+export function createAudioDecodeStream(configuration: AudioDecoderConfig): Observable<{
   decoder: AudioDecoder;
   frame$: Observable<AudioData>;
-} {
-  let decoder!: VideoDecoder;
-  const frame$ = new Observable<AudioData>((subscriber) => {
+}> {
+  const frame$ = new Subject<AudioData>()
+  const decoder$ = new Observable<AudioDecoder>((subscriber) => {
     let isFinalized = false;
-    decoder = new AudioDecoder({
-      output: (frame) => subscriber.next(frame),
+    const decoder = new AudioDecoder({
+      output: (frame) => frame$.next(frame),
       error: (e) => {
         if (!isFinalized) {
           isFinalized = true;
+          frame$.error(e);
           subscriber.error(e);
         }
       },
@@ -20,16 +22,19 @@ export function createAudioDecodeStream(configuration: AudioDecoderConfig): {
 
     decoder.configure(configuration);
 
+    subscriber.next(decoder);
+
     return () => {
       if (!isFinalized) {
         isFinalized = true;
+        frame$.complete();
         decoder.close();
       }
     };
-  });
+  })
 
-  return {
+  return decoder$.pipe(map((decoder) => ({
     decoder,
-    frame$,
-  };
+    frame$
+  })));
 }

@@ -1,7 +1,8 @@
 import {EbmlTagIdEnum, type EbmlTagsTagType, type EbmlTagTagType} from "konoebml";
-import {TagSchema, type TagType} from "../schema.ts";
+import {TagSchema, type TagType} from "../schema";
 
-import {type SegmentComponent, SegmentComponentSystemTrait} from "./segment.ts";
+import type {SegmentComponent} from "./segment";
+import {SegmentComponentSystemTrait} from "./segment-component";
 
 export class TagSystem extends SegmentComponentSystemTrait<
   EbmlTagTagType,

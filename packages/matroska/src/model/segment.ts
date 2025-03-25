@@ -12,7 +12,6 @@ import {
   takeWhile,
   share,
   map,
-  last,
   switchMap,
   shareReplay,
   EMPTY,
@@ -23,6 +22,8 @@ import {
   merge,
   isEmpty,
   finalize,
+  delayWhen,
+  from,
 } from 'rxjs';
 import type { CreateMatroskaOptions } from '.';
 import { type ClusterType, TrackTypeRestrictionEnum } from '../schema';
@@ -51,7 +52,6 @@ export interface CreateMatroskaSegmentOptions {
 export interface MatroskaSegmentModel {
   startTag: EbmlSegmentTagType;
   segment: SegmentSystem;
-  metadataTags$: Observable<EbmlTagType>;
   loadedMetadata$: Observable<SegmentSystem>;
   loadedTags$: Observable<SegmentSystem>;
   loadedCues$: Observable<SegmentSystem>;
@@ -59,19 +59,19 @@ export interface MatroskaSegmentModel {
   videoTrackDecoder: (
     track: VideoTrackContext,
     cluster$: Observable<ClusterType>
-  ) => {
+  ) => Observable<{
     track: VideoTrackContext;
     decoder: VideoDecoder;
     frame$: Observable<VideoFrame>;
-  };
+  }>;
   audioTrackDecoder: (
     track: AudioTrackContext,
     cluster$: Observable<ClusterType>
-  ) => {
+  ) => Observable<{
     track: AudioTrackContext;
     decoder: AudioDecoder;
     frame$: Observable<AudioData>;
-  };
+  }>;
   defaultVideoTrack$: Observable<VideoTrackContext | undefined>;
   defaultAudioTrack$: Observable<AudioTrackContext | undefined>;
 }
@@ -88,16 +88,20 @@ export function createMatroskaSegment({
   const metaScan$ = ebml$.pipe(
     scan(
       (acc, tag) => {
-        acc.segment.scanMeta(tag);
+        const segment = acc.segment;
+        segment.scanMeta(tag);
         acc.tag = tag;
+        acc.canComplete = segment.canCompleteMeta();
         return acc;
       },
       {
         segment,
         tag: undefined as unknown as EbmlTagType,
+        canComplete: false,
       }
     ),
-    takeWhile((acc) => acc.segment.canCompleteMeta(), true),
+    takeWhile(({ canComplete }) => !canComplete, true),
+    delayWhen(({ segment }) => from(segment.completeMeta())),
     share({
       resetOnComplete: false,
       resetOnError: false,
@@ -105,12 +109,11 @@ export function createMatroskaSegment({
     })
   );
 
-  const metadataTags$ = metaScan$.pipe(map(({ tag }) => tag));
-
   const loadedMetadata$ = metaScan$.pipe(
-    last(),
-    switchMap(({ segment }) => segment.completeMeta()),
-    shareReplay(1)
+    filter(({ canComplete }) => canComplete),
+    map(({ segment }) => segment),
+    take(1),
+    shareReplay(1),
   );
 
   const loadedRemoteCues$ = loadedMetadata$.pipe(
@@ -297,88 +300,94 @@ export function createMatroskaSegment({
     track: VideoTrackContext,
     cluster$: Observable<ClusterType>
   ) => {
-    const { decoder, frame$ } = createVideoDecodeStream(track.configuration);
+    return createVideoDecodeStream(track.configuration).pipe(
+      map(({ decoder, frame$ }) => {
+        const clusterSystem = segment.cluster;
+        const infoSystem = segment.info;
+        const timestampScale = Number(infoSystem.info.TimestampScale) / 1000;
 
-    const clusterSystem = segment.cluster;
+        const decodeSubscription = cluster$.subscribe((cluster) => {
+          for (const block of clusterSystem.enumerateBlocks(
+            cluster,
+            track.trackEntry
+          )) {
+            const blockTime = (Number(cluster.Timestamp) + block.relTime) * timestampScale;
+            const blockDuration =
+              frames.length > 1 ? track.predictBlockDuration(blockTime) * timestampScale : 0;
+            const perFrameDuration =
+              frames.length > 1 && blockDuration
+                ? blockDuration / block.frames.length
+                : 0;
 
-    const decodeSubscription = cluster$.subscribe((cluster) => {
-      for (const block of clusterSystem.enumerateBlocks(
-        cluster,
-        track.trackEntry
-      )) {
-        const blockTime = Number(cluster.Timestamp) + block.relTime;
-        const blockDuration =
-          frames.length > 1 ? track.predictBlockDuration(blockTime) : 0;
-        const perFrameDuration =
-          frames.length > 1 && blockDuration
-            ? blockDuration / block.frames.length
-            : 0;
+            for (const frame of block.frames) {
+              const chunk = new EncodedVideoChunk({
+                type: block.keyframe ? 'key' : 'delta',
+                data: frame,
+                timestamp: blockTime + perFrameDuration,
+              });
 
-        for (const frame of block.frames) {
-          const chunk = new EncodedVideoChunk({
-            type: block.keyframe ? 'key' : 'delta',
-            data: frame,
-            timestamp: blockTime + perFrameDuration,
-          });
+              decoder.decode(chunk);
+            }
+          }
+        });
 
-          decoder.decode(chunk);
+        return {
+          track,
+          decoder,
+          frame$: frame$
+            .pipe(
+              finalize(() => {
+                decodeSubscription.unsubscribe();
+              })
+            )
         }
-      }
-    });
-
-    return {
-      track,
-      decoder,
-      frame$: frame$
-        .pipe(
-          finalize(() => {
-            decodeSubscription.unsubscribe();
-          })
-        )
-        .pipe(share()),
-    };
+      })
+    );
   };
 
   const audioTrackDecoder = (
     track: AudioTrackContext,
     cluster$: Observable<ClusterType>
   ) => {
-    const { decoder, frame$ } = createAudioDecodeStream(track.configuration);
+    return createAudioDecodeStream(track.configuration).pipe(
+      map(({ decoder, frame$ }) => {
+        const clusterSystem = segment.cluster;
+        const infoSystem = segment.info;
+        const timestampScale = Number(infoSystem.info.TimestampScale) / 1000;
 
-    const clusterSystem = segment.cluster;
+        const decodeSubscription = cluster$.subscribe((cluster) => {
+          for (const block of clusterSystem.enumerateBlocks(
+            cluster,
+            track.trackEntry
+          )) {
+            const blockTime = (Number(cluster.Timestamp) + block.relTime) * timestampScale;
+            const blockDuration =
+              frames.length > 1 ? track.predictBlockDuration(blockTime) : 0;
+            const perFrameDuration =
+              frames.length > 1 && blockDuration
+                ? blockDuration / block.frames.length
+                : 0;
 
-    const decodeSubscription = cluster$.subscribe((cluster) => {
-      for (const block of clusterSystem.enumerateBlocks(
-        cluster,
-        track.trackEntry
-      )) {
-        const blockTime = Number(cluster.Timestamp) + block.relTime;
-        const blockDuration =
-          frames.length > 1 ? track.predictBlockDuration(blockTime) : 0;
-        const perFrameDuration =
-          frames.length > 1 && blockDuration
-            ? blockDuration / block.frames.length
-            : 0;
+            let i = 0;
+            for (const frame of block.frames) {
+              const chunk = new EncodedAudioChunk({
+                type: block.keyframe ? 'key' : 'delta',
+                data: frame,
+                timestamp: blockTime + perFrameDuration * i,
+              });
+              i++;
 
-        let i = 0;
-        for (const frame of block.frames) {
-          const chunk = new EncodedAudioChunk({
-            type: block.keyframe ? 'key' : 'delta',
-            data: frame,
-            timestamp: blockTime + perFrameDuration * i,
-          });
-          i++;
+              decoder.decode(chunk);
+            }
+          }
+        });
 
-          decoder.decode(chunk);
-        }
-      }
-    });
-
-    return {
-      track,
-      decoder,
-      frame$: frame$.pipe(finalize(() => decodeSubscription.unsubscribe())),
-    };
+        return {
+          track,
+          decoder,
+          frame$: frame$.pipe(finalize(() => decodeSubscription.unsubscribe())),
+        };
+    }));
   };
 
   const defaultVideoTrack$ = loadedMetadata$.pipe(
@@ -406,7 +415,6 @@ export function createMatroskaSegment({
   return {
     startTag,
     segment,
-    metadataTags$,
     loadedMetadata$,
     loadedTags$,
     loadedCues$,
@@ -414,6 +422,6 @@ export function createMatroskaSegment({
     videoTrackDecoder,
     audioTrackDecoder,
     defaultVideoTrack$,
-    defaultAudioTrack$,
+    defaultAudioTrack$
   };
 }

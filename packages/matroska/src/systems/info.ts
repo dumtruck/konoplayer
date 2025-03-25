@@ -1,6 +1,7 @@
 import type {EbmlInfoTagType} from "konoebml";
-import {InfoSchema, type InfoType} from "../schema.ts";
-import {type SegmentComponent, SegmentComponentSystemTrait} from "./segment.ts";
+import {InfoSchema, type InfoType} from "../schema";
+import type {SegmentComponent} from "./segment";
+import {SegmentComponentSystemTrait} from "./segment-component";
 
 export class InfoSystem extends SegmentComponentSystemTrait<
   EbmlInfoTagType,

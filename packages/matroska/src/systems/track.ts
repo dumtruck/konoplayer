@@ -1,7 +1,7 @@
 import {
   ParseCodecErrors,
   UnsupportedCodecError,
-} from '@konoplayer/core/errors.ts';
+} from '@konoplayer/core/errors';
 import {
   EbmlTagIdEnum,
   type EbmlTrackEntryTagType,
@@ -19,7 +19,9 @@ import {
   type TrackEntryType,
   TrackTypeRestrictionEnum,
 } from '../schema';
-import { type SegmentComponent, SegmentComponentSystemTrait } from './segment';
+import type { SegmentComponent } from './segment';
+import {SegmentComponentSystemTrait} from "./segment-component";
+import {pick} from "lodash-es";
 
 export interface GetTrackEntryOptions {
   priority?: (v: SegmentComponent<TrackEntryType>) => number;
@@ -29,13 +31,13 @@ export interface GetTrackEntryOptions {
 export abstract class TrackContext {
   peekingKeyframe?: Uint8Array;
   trackEntry: TrackEntryType;
-  timecodeScale: number;
+  timestampScale: number;
   lastBlockTimestamp = Number.NaN;
   averageBlockDuration = Number.NaN;
 
-  constructor(trackEntry: TrackEntryType, timecodeScale: number) {
+  constructor(trackEntry: TrackEntryType, timestampScale: number) {
     this.trackEntry = trackEntry;
-    this.timecodeScale = timecodeScale;
+    this.timestampScale = Number(timestampScale);
   }
 
   peekKeyframe(payload: Uint8Array) {
@@ -87,7 +89,8 @@ export class VideoTrackContext extends TrackContext {
       this.trackEntry,
       this.peekingKeyframe
     );
-    if (await VideoDecoder.isConfigSupported(configuration)) {
+    const checkResult = await VideoDecoder?.isConfigSupported?.(configuration);
+    if (!checkResult?.supported) {
       throw new UnsupportedCodecError(configuration.codec, 'video decoder');
     }
     this.configuration = configuration;
@@ -106,7 +109,8 @@ export class AudioTrackContext extends TrackContext {
       this.trackEntry,
       this.peekingKeyframe
     );
-    if (await AudioDecoder.isConfigSupported(configuration)) {
+    const checkResult = await AudioDecoder?.isConfigSupported?.(configuration);
+    if (!checkResult?.supported) {
       throw new UnsupportedCodecError(configuration.codec, 'audio decoder');
     }
 
@@ -121,8 +125,7 @@ export class AudioTrackContext extends TrackContext {
       return (
         Number(
           this.configuration.samplesPerFrame / this.configuration.sampleRate
-        ) *
-        (1_000_000_000 / Number(this.timecodeScale))
+        ) * this.timestampScale
       );
     }
     const delta = blockTimestamp - this.lastBlockTimestamp;
@@ -203,7 +206,7 @@ export class TrackSystem extends SegmentComponentSystemTrait<
       }
     }
     if (parseErrors.cause.length > 0) {
-      console.error(parseErrors);
+      console.error(parseErrors, parseErrors.cause);
     }
   }
 

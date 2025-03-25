@@ -22,7 +22,7 @@
         "moduleDetection": "force",
         "moduleResolution": "bundler",
         "resolveJsonModule": true,
-        "allowImportingTsExtensions": true,
+        "allowImportingTsExtensions": false,
         "emitDeclarationOnly": true,
         "skipLibCheck": true,
         "target": "ES2021",

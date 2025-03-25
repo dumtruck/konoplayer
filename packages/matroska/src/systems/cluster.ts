@@ -6,7 +6,8 @@ import {
   type BlockGroupType,
   type TrackEntryType,
 } from '../schema';
-import { type SegmentComponent, SegmentComponentSystemTrait } from './segment';
+import { type SegmentComponent } from './segment';
+import {SegmentComponentSystemTrait} from "./segment-component";
 
 export abstract class BlockViewTrait {
   abstract get keyframe(): boolean;

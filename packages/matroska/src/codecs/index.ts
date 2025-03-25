@@ -16,16 +16,16 @@ import {
 import {
   genCodecStringByAV1DecoderConfigurationRecord,
   parseAV1DecoderConfigurationRecord,
-} from './av1.ts';
+} from './av1';
 import {
   genCodecStringByHEVCDecoderConfigurationRecord,
   parseHEVCDecoderConfigurationRecord,
-} from './hevc.ts';
+} from './hevc';
 import {
   genCodecStringByVP9DecoderConfigurationRecord,
   parseVP9DecoderConfigurationRecord,
   VP9_CODEC_TYPE,
-} from './vp9.ts';
+} from './vp9';
 
 export const VideoCodecId = {
   VCM: 'V_MS/VFW/FOURCC',

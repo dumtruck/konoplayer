@@ -437,7 +437,7 @@ function main() {
   const elementSchemas = extractElementAll();
 
   const files = {
-    'schema.ts': [
+    'schema': [
       generateMkvSchemaImports(elementSchemas),
       generateMkvSchemaHierarchy(elementSchemas),
     ],

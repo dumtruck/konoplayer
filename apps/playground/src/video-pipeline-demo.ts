@@ -13,7 +13,7 @@ import {
   fromEvent,
   share,
   takeUntil,
-  firstValueFrom,
+  firstValueFrom, tap, throwIfEmpty, ReplaySubject, finalize, of, interval,
 } from 'rxjs';
 import { createMatroska } from '@konoplayer/matroska/model';
 import { createRef, ref, type Ref } from 'lit/directives/ref.js';
@@ -45,14 +45,12 @@ export class VideoPipelineDemo extends LitElement {
 
   videoRef: Ref<HTMLVideoElement> = createRef();
   renderingContext = createRenderingContext();
-  audioContext = new AudioContext();
-  canvasSource = new MediaSource();
+  audioContext = new AudioContext({});
 
-  seeked$ = new Subject<number>();
+  seeked$ = new ReplaySubject<number>(1);
 
   videoFrameBuffer$ = new BehaviorSubject(new Queue<VideoFrame>());
   audioFrameBuffer$ = new BehaviorSubject(new Queue<AudioData>());
-  private startTime = 0;
 
   paused$ = new BehaviorSubject<boolean>(false);
   ended$ = new BehaviorSubject<boolean>(false);
@@ -80,37 +78,37 @@ export class VideoPipelineDemo extends LitElement {
         videoTrackDecoder,
         audioTrackDecoder,
       },
+      totalSize
     } = await firstValueFrom(
       createMatroska({
         url: src,
-      })
-    );
+      }).pipe(
+        throwIfEmpty(() => new Error("failed to extract matroska"))
+      )
+    )
+
+    console.debug(`[MATROSKA]: loaded metadata, total size ${totalSize} bytes`)
 
     const currentCluster$ = this.seeked$.pipe(
       switchMap((seekTime) => seek(seekTime)),
-      share()
+      share({ resetOnRefCountZero: false, resetOnError: false, resetOnComplete: false }),
     );
 
     defaultVideoTrack$
-      .pipe(takeUntil(destroyRef$), take(1))
-      .subscribe(this.videoTrack$);
+      .pipe(take(1), takeUntil(destroyRef$), tap((track) => console.debug('[MATROSKA]: video track loaded,', track)))
+      .subscribe(this.videoTrack$.next.bind(this.videoTrack$));
 
     defaultAudioTrack$
-      .pipe(takeUntil(destroyRef$), take(1))
-      .subscribe(this.audioTrack$);
+      .pipe(take(1), takeUntil(destroyRef$), tap((track) => console.debug('[MATROSKA]: audio track loaded,', track)))
+      .subscribe(this.audioTrack$.next.bind(this.audioTrack$));
 
     this.videoTrack$
       .pipe(
         takeUntil(this.destroyRef$),
-        map((track) =>
-          track ? videoTrackDecoder(track, currentCluster$) : undefined
+        switchMap((track) =>
+          track?.configuration ? videoTrackDecoder(track, currentCluster$) : EMPTY
         ),
-        switchMap((decoder) => {
-          if (!decoder) {
-            return EMPTY;
-          }
-          return decoder.frame$;
-        })
+        switchMap(({ frame$ }) => frame$)
       )
       .subscribe((frame) => {
         const buffer = this.videoFrameBuffer$.value;
@@ -121,15 +119,10 @@ export class VideoPipelineDemo extends LitElement {
     this.audioTrack$
       .pipe(
         takeUntil(this.destroyRef$),
-        map((track) =>
-          track ? audioTrackDecoder(track, currentCluster$) : undefined
+        switchMap((track) =>
+          track?.configuration ? audioTrackDecoder(track, currentCluster$) : EMPTY
         ),
-        switchMap((decoder) => {
-          if (!decoder) {
-            return EMPTY;
-          }
-          return decoder.frame$;
-        })
+        switchMap(({ frame$ }) => frame$)
       )
       .subscribe((frame) => {
         const buffer = this.audioFrameBuffer$.value;
@@ -137,39 +130,52 @@ export class VideoPipelineDemo extends LitElement {
         this.audioFrameBuffer$.next(buffer);
       });
 
-    combineLatest({
+    let playableStartTime = 0;
+    const playable = combineLatest({
       paused: this.paused$,
       ended: this.ended$,
-      buffered: this.audioFrameBuffer$.pipe(
+      audioBuffered: this.audioFrameBuffer$.pipe(
         map((q) => q.size >= 1),
         distinctUntilChanged()
       ),
-    })
+      videoBuffered: this.videoFrameBuffer$.pipe(
+        map((q) => q.size >= 1),
+        distinctUntilChanged()
+      ),
+    }).pipe(
+      takeUntil(this.destroyRef$),
+      map(({ ended, paused, videoBuffered, audioBuffered }) => !paused && !ended && !!(videoBuffered || audioBuffered)),
+      tap((enabled) => {
+        if (enabled) {
+          playableStartTime = performance.now()
+        }
+      }),
+      share()
+    )
+
+    let nextAudioStartTime = 0;
+    playable
       .pipe(
-        takeUntil(this.destroyRef$),
-        map(({ ended, paused, buffered }) => !paused && !ended && !!buffered),
-        switchMap((enabled) => (enabled ? animationFrames() : EMPTY))
+        tap(() => {
+          nextAudioStartTime = 0
+        }),
+        switchMap((enabled) => (enabled ? animationFrames() : EMPTY)),
       )
       .subscribe(() => {
         const audioFrameBuffer = this.audioFrameBuffer$.getValue();
+        const audioContext = this.audioContext;
         const nowTime = performance.now();
-        const accTime = nowTime - this.startTime;
+        const accTime = nowTime - playableStartTime;
         let audioChanged = false;
         while (audioFrameBuffer.size > 0) {
           const firstAudio = audioFrameBuffer.peek();
-          if (firstAudio && firstAudio.timestamp <= accTime * 1000) {
+          if (firstAudio && (firstAudio.timestamp / 1000) <= accTime) {
             const audioFrame = audioFrameBuffer.dequeue()!;
             audioChanged = true;
-            const audioContext = this.audioContext;
-
             if (audioContext) {
               const numberOfChannels = audioFrame.numberOfChannels;
               const sampleRate = audioFrame.sampleRate;
               const numberOfFrames = audioFrame.numberOfFrames;
-              const data = new Float32Array(numberOfFrames * numberOfChannels);
-              audioFrame.copyTo(data, {
-                planeIndex: 0,
-              });
 
               const audioBuffer = audioContext.createBuffer(
                 numberOfChannels,
@@ -177,14 +183,22 @@ export class VideoPipelineDemo extends LitElement {
                 sampleRate
               );
 
+              // add fade-in-out
+              const fadeLength = Math.min(50, audioFrame.numberOfFrames);
               for (let channel = 0; channel < numberOfChannels; channel++) {
-                const channelData = audioBuffer.getChannelData(channel);
-                for (let i = 0; i < numberOfFrames; i++) {
-                  channelData[i] = data[i * numberOfChannels + channel];
+                const channelData = new Float32Array(numberOfFrames);
+                audioFrame.copyTo(channelData, { planeIndex: channel, frameCount: numberOfFrames });
+                for (let i = 0; i < fadeLength; i++) {
+                  channelData[i] *= i / fadeLength; // fade-in
+                  channelData[audioFrame.numberOfFrames - 1 - i] *= i / fadeLength; // fade-out
                 }
+                audioBuffer.copyToChannel(channelData, channel);
               }
 
-              const audioTime = audioFrame.timestamp / 1000000;
+              /**
+               * @TODO: ADD TIME SYNC
+               */
+              const audioTime = audioFrame.timestamp / 1_000_000;
 
               audioFrame.close();
 
@@ -192,11 +206,10 @@ export class VideoPipelineDemo extends LitElement {
                 const audioSource = audioContext.createBufferSource();
                 audioSource.buffer = audioBuffer;
                 audioSource.connect(audioContext.destination);
-
-                audioSource.start(
-                  audioContext.currentTime +
-                    Math.max(0, audioTime - accTime / 1000)
-                );
+                const currentTime = audioContext.currentTime;
+                nextAudioStartTime = Math.max(nextAudioStartTime, currentTime); // 确保不早于当前时间
+                audioSource.start(nextAudioStartTime);
+                nextAudioStartTime += audioBuffer.duration;
               }
             }
           } else {
@@ -208,35 +221,26 @@ export class VideoPipelineDemo extends LitElement {
         }
       });
 
-    combineLatest({
-      paused: this.paused$,
-      ended: this.ended$,
-      buffered: this.videoFrameBuffer$.pipe(
-        map((q) => q.size >= 1),
-        distinctUntilChanged()
-      ),
-    })
+    playable
       .pipe(
-        takeUntil(this.destroyRef$),
-        map(({ ended, paused, buffered }) => !paused && !ended && !!buffered),
-        switchMap((enabled) => (enabled ? animationFrames() : EMPTY))
+        switchMap((enabled) => (enabled ? animationFrames() : EMPTY)),
       )
       .subscribe(async () => {
+        const renderingContext = this.renderingContext;
         const videoFrameBuffer = this.videoFrameBuffer$.getValue();
         let videoChanged = false;
         const nowTime = performance.now();
-        const accTime = nowTime - this.startTime;
+        const accTime = nowTime - playableStartTime;
         while (videoFrameBuffer.size > 0) {
           const firstVideo = videoFrameBuffer.peek();
-          if (firstVideo && firstVideo.timestamp <= accTime * 1000) {
+          if (firstVideo && (firstVideo.timestamp / 1000) <= accTime) {
             const videoFrame = videoFrameBuffer.dequeue()!;
-            const renderingContext = this.renderingContext;
+            videoChanged = true;
             if (renderingContext) {
               const bitmap = await createImageBitmap(videoFrame);
               renderBitmapAtRenderingContext(renderingContext, bitmap);
-              videoFrame.close();
-              videoChanged = true;
             }
+            videoFrame.close();
           } else {
             break;
           }
@@ -252,22 +256,18 @@ export class VideoPipelineDemo extends LitElement {
         this.audioContext.resume();
         this.audioFrameBuffer$.next(this.audioFrameBuffer$.getValue());
       });
+
+    this.seeked$.next(0)
   }
 
-  connectedCallback(): void {
+  async connectedCallback() {
     super.connectedCallback();
-    this.preparePipeline();
+    await this.preparePipeline();
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    this.destroyRef$.next();
-  }
-
-  render() {
-    return html`
-        <video ref=${ref(this.videoRef)}></video>
-      `;
+    this.destroyRef$.next(undefined);
   }
 
   firstUpdated() {
@@ -303,8 +303,16 @@ export class VideoPipelineDemo extends LitElement {
 
     frameRate$
       .pipe(takeUntil(destroyRef$), distinctUntilChanged())
-      .subscribe((frameRate) =>
-        captureCanvasAsVideoSrcObject(video, canvas, frameRate)
-      );
+      .subscribe((frameRate) => {
+        canvas.width = this.width || 1;
+        canvas.height = this.height || 1;
+        captureCanvasAsVideoSrcObject(video, canvas, frameRate);
+      });
+  }
+
+  render() {
+    return html`
+        <video ref=${ref(this.videoRef)} width=${this.width} height=${this.height} autoplay muted></video>
+      `;
   }
 }
