@@ -26,4 +26,15 @@
       - [ ] FLAC (need tested)
   - [ ] Wrap video element with customElements (Prototyping / Lit-html + Typescript)
   - [ ] Add WebCodecs polyfill with ffmpeg or libav (Todo / WASM)
-  - [ ] Danmuku integrated (Todo / Typescript)
+    - [x] Chrome/Edge/Android Webview: WebCodecs Native support
+    - [ ] FIREFOX 
+      - [x] VP8/VP9/AV1 native support
+      - [x] AVC/HEVC 8bit native support
+      - [ ] AVC/HEVC >= 10bit polyfill needed
+      - [ ] Firefox Android not support
+    - [ ] Safari
+        - [x] VP8/VP9/AV1 native support
+        - [x] AVC/HEVC 8bit native support
+        - [ ] AVC/HEVC >= 10bit polyfill needed for some devices
+        - [ ] Audio Decoder polyfill needed
+    - [ ] Danmuku integration (Todo / Typescript)
