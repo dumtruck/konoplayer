@@ -23,3 +23,9 @@ export class ParseCodecErrors extends Error {
     super('failed to parse codecs');
   }
 }
+
+export class UnimplementedError extends Error {
+  constructor(detail: string) {
+    super(`unimplemented: ${detail}`);
+  }
+}

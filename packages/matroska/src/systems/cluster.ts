@@ -7,7 +7,7 @@ import {
   type TrackEntryType,
 } from '../schema';
 import { type SegmentComponent } from './segment';
-import {SegmentComponentSystemTrait} from "./segment-component";
+import { SegmentComponentSystemTrait } from './segment-component';
 
 export abstract class BlockViewTrait {
   abstract get keyframe(): boolean;
@@ -82,17 +82,33 @@ export class ClusterSystem extends SegmentComponentSystemTrait<
     cluster: ClusterType,
     track: TrackEntryType
   ): Generator<BlockViewTrait> {
-    if (cluster.SimpleBlock) {
-      for (const block of cluster.SimpleBlock) {
-        if (block.track === track.TrackNumber) {
-          yield new SimpleBlockView(block);
-        }
-      }
-    }
-    if (cluster.BlockGroup) {
+    if (cluster.BlockGroup && cluster.SimpleBlock) {
+      const blocks = [];
       for (const block of cluster.BlockGroup) {
         if (block.Block.track === track.TrackNumber) {
-          yield new BlockGroupView(block);
+          blocks.push(new BlockGroupView(block));
+        }
+      }
+      for (const block of cluster.SimpleBlock) {
+        if (block.track === track.TrackNumber) {
+          blocks.push(new SimpleBlockView(block));
+        }
+      }
+      blocks.sort((a, b) => a.relTime - b.relTime);
+      yield* blocks;
+    } else {
+      if (cluster.SimpleBlock) {
+        for (const block of cluster.SimpleBlock) {
+          if (block.track === track.TrackNumber) {
+            yield new SimpleBlockView(block);
+          }
+        }
+      }
+      if (cluster.BlockGroup) {
+        for (const block of cluster.BlockGroup) {
+          if (block.Block.track === track.TrackNumber) {
+            yield new BlockGroupView(block);
+          }
         }
       }
     }

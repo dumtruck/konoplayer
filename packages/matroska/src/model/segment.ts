@@ -24,6 +24,7 @@ import {
   finalize,
   delayWhen,
   from,
+  combineLatest,
 } from 'rxjs';
 import type { CreateMatroskaOptions } from '.';
 import { type ClusterType, TrackTypeRestrictionEnum } from '../schema';
@@ -113,7 +114,7 @@ export function createMatroskaSegment({
     filter(({ canComplete }) => canComplete),
     map(({ segment }) => segment),
     take(1),
-    shareReplay(1),
+    shareReplay(1)
   );
 
   const loadedRemoteCues$ = loadedMetadata$.pipe(
@@ -304,22 +305,33 @@ export function createMatroskaSegment({
       map(({ decoder, frame$ }) => {
         const clusterSystem = segment.cluster;
         const infoSystem = segment.info;
+        const trackSystem = segment.track;
         const timestampScale = Number(infoSystem.info.TimestampScale) / 1000;
+
+        const frameProcessing = trackSystem.buildFrameEncodingProcessor(
+          track.trackEntry
+        );
 
         const decodeSubscription = cluster$.subscribe((cluster) => {
           for (const block of clusterSystem.enumerateBlocks(
             cluster,
             track.trackEntry
           )) {
-            const blockTime = (Number(cluster.Timestamp) + block.relTime) * timestampScale;
+            const blockTime =
+              (Number(cluster.Timestamp) + block.relTime) * timestampScale;
             const blockDuration =
-              frames.length > 1 ? track.predictBlockDuration(blockTime) * timestampScale : 0;
+              frames.length > 1
+                ? track.predictBlockDuration(blockTime) * timestampScale
+                : 0;
             const perFrameDuration =
               frames.length > 1 && blockDuration
                 ? blockDuration / block.frames.length
                 : 0;
 
-            for (const frame of block.frames) {
+            for (let frame of block.frames) {
+              if (frameProcessing) {
+                frame = frameProcessing(frame);
+              }
               const chunk = new EncodedVideoChunk({
                 type: block.keyframe ? 'key' : 'delta',
                 data: frame,
@@ -334,13 +346,12 @@ export function createMatroskaSegment({
         return {
           track,
           decoder,
-          frame$: frame$
-            .pipe(
-              finalize(() => {
-                decodeSubscription.unsubscribe();
-              })
-            )
-        }
+          frame$: frame$.pipe(
+            finalize(() => {
+              decodeSubscription.unsubscribe();
+            })
+          ),
+        };
       })
     );
   };
@@ -353,14 +364,20 @@ export function createMatroskaSegment({
       map(({ decoder, frame$ }) => {
         const clusterSystem = segment.cluster;
         const infoSystem = segment.info;
+        const trackSystem = segment.track;
         const timestampScale = Number(infoSystem.info.TimestampScale) / 1000;
+
+        const frameProcessing = trackSystem.buildFrameEncodingProcessor(
+          track.trackEntry
+        );
 
         const decodeSubscription = cluster$.subscribe((cluster) => {
           for (const block of clusterSystem.enumerateBlocks(
             cluster,
             track.trackEntry
           )) {
-            const blockTime = (Number(cluster.Timestamp) + block.relTime) * timestampScale;
+            const blockTime =
+              (Number(cluster.Timestamp) + block.relTime) * timestampScale;
             const blockDuration =
               frames.length > 1 ? track.predictBlockDuration(blockTime) : 0;
             const perFrameDuration =
@@ -369,7 +386,10 @@ export function createMatroskaSegment({
                 : 0;
 
             let i = 0;
-            for (const frame of block.frames) {
+            for (let frame of block.frames) {
+              if (frameProcessing) {
+                frame = frameProcessing(frame);
+              }
               const chunk = new EncodedAudioChunk({
                 type: block.keyframe ? 'key' : 'delta',
                 data: frame,
@@ -387,7 +407,8 @@ export function createMatroskaSegment({
           decoder,
           frame$: frame$.pipe(finalize(() => decodeSubscription.unsubscribe())),
         };
-    }));
+      })
+    );
   };
 
   const defaultVideoTrack$ = loadedMetadata$.pipe(
@@ -422,6 +443,6 @@ export function createMatroskaSegment({
     videoTrackDecoder,
     audioTrackDecoder,
     defaultVideoTrack$,
-    defaultAudioTrack$
+    defaultAudioTrack$,
   };
 }

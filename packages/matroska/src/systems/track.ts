@@ -1,5 +1,6 @@
 import {
   ParseCodecErrors,
+  UnimplementedError,
   UnsupportedCodecError,
 } from '@konoplayer/core/errors';
 import {
@@ -15,13 +16,14 @@ import {
   type VideoDecoderConfigExt,
 } from '../codecs';
 import {
+  ContentCompAlgoRestrictionEnum,
+  ContentEncodingTypeRestrictionEnum,
   TrackEntrySchema,
   type TrackEntryType,
   TrackTypeRestrictionEnum,
 } from '../schema';
 import type { SegmentComponent } from './segment';
-import {SegmentComponentSystemTrait} from "./segment-component";
-import {pick} from "lodash-es";
+import { SegmentComponentSystemTrait } from './segment-component';
 
 export interface GetTrackEntryOptions {
   priority?: (v: SegmentComponent<TrackEntryType>) => number;
@@ -225,5 +227,50 @@ export class TrackSystem extends SegmentComponentSystemTrait<
       }
     }
     return true;
+  }
+
+  buildFrameEncodingProcessor(
+    track: TrackEntryType
+  ): undefined | ((source: Uint8Array) => Uint8Array) {
+    let encodings = track.ContentEncodings?.ContentEncoding;
+    if (!encodings?.length) {
+      return undefined;
+    }
+    encodings = encodings.toSorted(
+      (a, b) => Number(b.ContentEncodingOrder) - Number(a.ContentEncodingOrder)
+    );
+    const processors: Array<(source: Uint8Array) => Uint8Array> = [];
+    for (const encoing of encodings) {
+      if (
+        encoing.ContentEncodingType ===
+        ContentEncodingTypeRestrictionEnum.COMPRESSION
+      ) {
+        const compression = encoing.ContentCompression;
+        const algo = compression?.ContentCompAlgo;
+        if (algo === ContentCompAlgoRestrictionEnum.HEADER_STRIPPING) {
+          const settings = compression?.ContentCompSettings;
+          if (settings?.length) {
+            processors.push((source: Uint8Array) => {
+              const dest = new Uint8Array(source.length + settings.length);
+              dest.set(source);
+              dest.set(settings, source.length);
+              return dest;
+            });
+          }
+        } else {
+          // TODO: dynamic import packages to support more compression algos
+          throw new UnimplementedError(
+            `compression algo ${ContentCompAlgoRestrictionEnum[algo as ContentCompAlgoRestrictionEnum]}`
+          );
+        }
+      }
+    }
+    return function processor(source: Uint8Array): Uint8Array<ArrayBufferLike> {
+      let dest = source;
+      for (const processor of processors) {
+        dest = processor(dest);
+      }
+      return dest;
+    };
   }
 }
