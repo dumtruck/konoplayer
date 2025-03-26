@@ -4,28 +4,30 @@ import {
   animationFrames,
   BehaviorSubject,
   combineLatest,
-  ReplaySubject,
   EMPTY,
   map,
-  Observable,
-  shareReplay,
   Subject,
-  Subscription,
   switchMap,
   take,
-  tap,
   distinctUntilChanged,
-  fromEvent, withLatestFrom, share, delay, delayWhen, from, of,
+  fromEvent,
+  share,
+  takeUntil,
+  firstValueFrom,
 } from 'rxjs';
-import { createEbmlController } from '@konoplayer/matroska/reactive';
-import {
-  TrackTypeRestrictionEnum,
-  type ClusterType,
-} from '@konoplayer/matroska/schema';
+import { createMatroska } from '@konoplayer/matroska/model';
 import { createRef, ref, type Ref } from 'lit/directives/ref.js';
 import { Queue } from 'mnemonist';
 
-import type {SegmentComponent, AudioTrackContext, VideoTrackContext} from "@konoplayer/matroska/systems";
+import type {
+  AudioTrackContext,
+  VideoTrackContext,
+} from '@konoplayer/matroska/systems';
+import {
+  captureCanvasAsVideoSrcObject,
+  createRenderingContext,
+  renderBitmapAtRenderingContext,
+} from '@konoplayer/core/graphics';
 
 export class VideoPipelineDemo extends LitElement {
   static styles = css``;
@@ -39,227 +41,116 @@ export class VideoPipelineDemo extends LitElement {
   @property({ type: Number })
   height = 720;
 
-  canvasRef: Ref<HTMLCanvasElement> = createRef();
+  destroyRef$ = new Subject<void>();
+
+  videoRef: Ref<HTMLVideoElement> = createRef();
+  renderingContext = createRenderingContext();
   audioContext = new AudioContext();
+  canvasSource = new MediaSource();
 
-  seek$ = new ReplaySubject<number>(1);
+  seeked$ = new Subject<number>();
 
-  cluster$ = new Subject<SegmentComponent<ClusterType>>();
   videoFrameBuffer$ = new BehaviorSubject(new Queue<VideoFrame>());
   audioFrameBuffer$ = new BehaviorSubject(new Queue<AudioData>());
-  pipeline$$?: Subscription;
   private startTime = 0;
 
   paused$ = new BehaviorSubject<boolean>(false);
   ended$ = new BehaviorSubject<boolean>(false);
 
-  private preparePipeline() {
+  currentTime$ = new BehaviorSubject<number>(0);
+  duration$ = new BehaviorSubject<number>(0);
+  frameRate$ = new BehaviorSubject<number>(30);
+
+  videoTrack$ = new BehaviorSubject<VideoTrackContext | undefined>(undefined);
+  audioTrack$ = new BehaviorSubject<AudioTrackContext | undefined>(undefined);
+
+  private async preparePipeline() {
     const src = this.src;
+    const destroyRef$ = this.destroyRef$;
+
     if (!src) {
       return;
     }
 
-    const { controller$ } = createEbmlController({
-      url: src,
-    });
-
-    const segmentContext$ = controller$.pipe(
-      switchMap(({ segments$ }) => segments$.pipe(take(1)))
+    const {
+      segment: {
+        seek,
+        defaultVideoTrack$,
+        defaultAudioTrack$,
+        videoTrackDecoder,
+        audioTrackDecoder,
+      },
+    } = await firstValueFrom(
+      createMatroska({
+        url: src,
+      })
     );
 
-    const videoTrack$ = segmentContext$.pipe(
-
-    )
-
-    const currentCluster$ = combineLatest({
-      seekTime: this.seek$,
-      segmentContext: segmentContext$,
-    }).pipe(
-      delayWhen(({ segmentContext: { segment } }) => from(segment.track.flushContexts())),
-      switchMap(({ seekTime, segmentContext }) => combineLatest({
-        segmentContext: of(segmentContext),
-        cluster: segmentContext.seek(seekTime),
-      })),
+    const currentCluster$ = this.seeked$.pipe(
+      switchMap((seekTime) => seek(seekTime)),
       share()
     );
 
-    const decodeVideo$ = currentCluster$.pipe(
+    defaultVideoTrack$
+      .pipe(takeUntil(destroyRef$), take(1))
+      .subscribe(this.videoTrack$);
 
-    )
+    defaultAudioTrack$
+      .pipe(takeUntil(destroyRef$), take(1))
+      .subscribe(this.audioTrack$);
 
-    const decode$ = segmentContext$.pipe(
-      switchMap(({ withMeta$ }) => withMeta$),
-      map((segment) => {
-        const trackSystem = segment.track;
-        const infoSystem = segment.info;
-        const videoTrack = trackSystem.getTrackContext<VideoTrackContext>({
-          predicate: (c) =>
-            c.TrackType === TrackTypeRestrictionEnum.VIDEO &&
-            c.FlagEnabled !== 0,
-        });
-        const audioTrack = trackSystem.getTrackContext({
-            predicate: (c) =>
-              c.TrackType === TrackTypeRestrictionEnum.AUDIO &&
-              c.FlagEnabled !== 0,
-        });
-
-        const videoDecode$ = track
-
-        const videoDecode$ = tracks.video
-          ? new Observable<VideoFrame>((subscriber) => {
-              let isFinalized = false;
-              const videoTrack = tracks.video!;
-              const decoder = new VideoDecoder({
-                output: (frame) => {
-                  subscriber.next(frame);
-                },
-                error: (e) => {
-                  if (!isFinalized) {
-                    isFinalized = true;
-                    subscriber.error(e);
-                  }
-                },
-              });
-
-              decoder.configure({
-                codec: 'hev1.2.2.L93.B0', // codec: 'vp8',
-                hardwareAcceleration: 'prefer-hardware',
-                description: videoTrack.CodecPrivate, // Uint8Array，包含 VPS/SPS/PPS
-              });
-
-              const sub = this.cluster$.subscribe((c) => {
-                if (!isFinalized) {
-                  for (const b of (c.SimpleBlock || []).filter(
-                    (b) => b.track === videoTrack.TrackNumber
-                  )) {
-                    const chunk = new EncodedVideoChunk({
-                      type: b.keyframe ? 'key' : 'delta',
-                      timestamp:
-                        ((infoSystem.info.TimestampScale as number) / 1000) *
-                        ((c.Timestamp as number) + b.value),
-                      data: b.payload,
-                    });
-                    decoder.decode(chunk);
-                  }
-                }
-              });
-
-              return () => {
-                if (!isFinalized) {
-                  isFinalized = true;
-                  decoder.close();
-                }
-                sub.unsubscribe();
-              };
-            })
-          : EMPTY;
-
-        const audioDecode$ = tracks.audio
-          ? new Observable<AudioData>((subscriber) => {
-              let isFinalized = false;
-
-              const decoder = new AudioDecoder({
-                output: (audioData) => {
-                  subscriber.next(audioData);
-                },
-                error: (e) => {
-                  if (!isFinalized) {
-                    isFinalized = true;
-                    subscriber.error(e);
-                  }
-                },
-              });
-
-              const audioTrack = tracks.audio!;
-              const sampleRate = audioTrack.Audio?.SamplingFrequency || 44100;
-              const codec = 'mp4a.40.2';
-              const numberOfChannels =
-                (audioTrack.Audio?.Channels as number) || 2;
-              const duration =
-                Math.round(Number(audioTrack.DefaultDuration) / 1000) ||
-                Math.round((1024 / sampleRate) * 1000000);
-
-              decoder.configure({
-                codec: codec,
-                description: audioTrack.CodecPrivate,
-                numberOfChannels,
-                sampleRate,
-              });
-
-              // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
-              const sub = this.cluster$.subscribe((c) => {
-                if (!isFinalized) {
-                  for (const b of (c.SimpleBlock || []).filter(
-                    (b) => b.track === audioTrack.TrackNumber
-                  )) {
-                    const blockTime = (c.Timestamp as number) + b.value;
-                    let n = 0;
-                    for (const f of b.frames) {
-                      const offsetTimeUs = (n + 1) * duration;
-                      decoder.decode(
-                        new EncodedAudioChunk({
-                          type: b.keyframe ? 'key' : 'delta',
-                          timestamp:
-                            ((infoSystem.info.TimestampScale as number) /
-                              1000) *
-                              blockTime +
-                            offsetTimeUs,
-                          data: f,
-                        })
-                      );
-                      n += 1;
-                    }
-                  }
-                }
-              });
-
-              return () => {
-                if (!isFinalized) {
-                  isFinalized = true;
-                }
-                sub.unsubscribe();
-              };
-            })
-          : EMPTY;
-
-        return {
-          video$: videoDecode$,
-          audio$: audioDecode$,
-        };
-      }),
-      shareReplay(1)
-    );
-
-    const addToVideoFrameBuffer$ = decode$.pipe(
-      switchMap((decode) => decode.video$),
-      tap((frame) => {
-        const buffer = this.videoFrameBuffer$.getValue();
+    this.videoTrack$
+      .pipe(
+        takeUntil(this.destroyRef$),
+        map((track) =>
+          track ? videoTrackDecoder(track, currentCluster$) : undefined
+        ),
+        switchMap((decoder) => {
+          if (!decoder) {
+            return EMPTY;
+          }
+          return decoder.frame$;
+        })
+      )
+      .subscribe((frame) => {
+        const buffer = this.videoFrameBuffer$.value;
         buffer.enqueue(frame);
         this.videoFrameBuffer$.next(buffer);
-      })
-    );
+      });
 
-    const addToAudioFrameBuffer$ = decode$.pipe(
-      switchMap((decode) => decode.audio$),
-      tap((frame) => {
-        const buffer = this.audioFrameBuffer$.getValue();
+    this.audioTrack$
+      .pipe(
+        takeUntil(this.destroyRef$),
+        map((track) =>
+          track ? audioTrackDecoder(track, currentCluster$) : undefined
+        ),
+        switchMap((decoder) => {
+          if (!decoder) {
+            return EMPTY;
+          }
+          return decoder.frame$;
+        })
+      )
+      .subscribe((frame) => {
+        const buffer = this.audioFrameBuffer$.value;
         buffer.enqueue(frame);
         this.audioFrameBuffer$.next(buffer);
-      })
-    );
+      });
 
-    const audio$ = combineLatest({
+    combineLatest({
       paused: this.paused$,
       ended: this.ended$,
       buffered: this.audioFrameBuffer$.pipe(
         map((q) => q.size >= 1),
         distinctUntilChanged()
       ),
-    }).pipe(
-      map(({ ended, paused, buffered }) => !paused && !ended && !!buffered),
-      switchMap((enabled) => (enabled ? animationFrames() : EMPTY)),
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
-      tap(() => {
+    })
+      .pipe(
+        takeUntil(this.destroyRef$),
+        map(({ ended, paused, buffered }) => !paused && !ended && !!buffered),
+        switchMap((enabled) => (enabled ? animationFrames() : EMPTY))
+      )
+      .subscribe(() => {
         const audioFrameBuffer = this.audioFrameBuffer$.getValue();
         const nowTime = performance.now();
         const accTime = nowTime - this.startTime;
@@ -315,20 +206,22 @@ export class VideoPipelineDemo extends LitElement {
         if (audioChanged) {
           this.audioFrameBuffer$.next(this.audioFrameBuffer$.getValue());
         }
-      })
-    );
+      });
 
-    const video$ = combineLatest({
+    combineLatest({
       paused: this.paused$,
       ended: this.ended$,
       buffered: this.videoFrameBuffer$.pipe(
         map((q) => q.size >= 1),
         distinctUntilChanged()
       ),
-    }).pipe(
-      map(({ ended, paused, buffered }) => !paused && !ended && !!buffered),
-      switchMap((enabled) => (enabled ? animationFrames() : EMPTY)),
-      tap(() => {
+    })
+      .pipe(
+        takeUntil(this.destroyRef$),
+        map(({ ended, paused, buffered }) => !paused && !ended && !!buffered),
+        switchMap((enabled) => (enabled ? animationFrames() : EMPTY))
+      )
+      .subscribe(async () => {
         const videoFrameBuffer = this.videoFrameBuffer$.getValue();
         let videoChanged = false;
         const nowTime = performance.now();
@@ -337,16 +230,10 @@ export class VideoPipelineDemo extends LitElement {
           const firstVideo = videoFrameBuffer.peek();
           if (firstVideo && firstVideo.timestamp <= accTime * 1000) {
             const videoFrame = videoFrameBuffer.dequeue()!;
-            const canvas = this.canvasRef.value;
-            const canvas2dContext = canvas?.getContext('2d');
-            if (canvas2dContext) {
-              canvas2dContext.drawImage(
-                videoFrame,
-                0,
-                0,
-                this.width,
-                this.height
-              );
+            const renderingContext = this.renderingContext;
+            if (renderingContext) {
+              const bitmap = await createImageBitmap(videoFrame);
+              renderBitmapAtRenderingContext(renderingContext, bitmap);
               videoFrame.close();
               videoChanged = true;
             }
@@ -357,49 +244,67 @@ export class VideoPipelineDemo extends LitElement {
         if (videoChanged) {
           this.videoFrameBuffer$.next(videoFrameBuffer);
         }
-      })
-    );
+      });
 
-    this.pipeline$$ = new Subscription();
-    this.pipeline$$.add(audio$.subscribe());
-    this.pipeline$$.add(video$.subscribe());
-    this.pipeline$$.add(addToVideoFrameBuffer$.subscribe());
-    this.pipeline$$.add(addToAudioFrameBuffer$.subscribe());
-    this.pipeline$$.add(currentCluster$.subscribe(this.cluster$));
-    this.pipeline$$.add(
-      fromEvent(document.body, 'click').subscribe(() => {
+    fromEvent(document.body, 'click')
+      .pipe(takeUntil(this.destroyRef$))
+      .subscribe(() => {
         this.audioContext.resume();
         this.audioFrameBuffer$.next(this.audioFrameBuffer$.getValue());
-      })
-    );
+      });
   }
 
   connectedCallback(): void {
     super.connectedCallback();
     this.preparePipeline();
-    this.seek(0);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    this.pipeline$$?.unsubscribe();
-  }
-
-  seek(seekTime: number) {
-    this.seek$.next(seekTime);
-  }
-
-  play() {
-    this.paused$.next(false);
-  }
-
-  pause() {
-    this.paused$.next(true);
+    this.destroyRef$.next();
   }
 
   render() {
     return html`
-      <canvas ref=${ref(this.canvasRef)} width=${this.width} height=${this.height}></canvas>
+        <video ref=${ref(this.videoRef)}></video>
       `;
+  }
+
+  firstUpdated() {
+    const video = this.videoRef.value;
+    const context = this.renderingContext;
+    const frameRate$ = this.frameRate$;
+    const destroyRef$ = this.destroyRef$;
+    const currentTime$ = this.currentTime$;
+    const duration$ = this.duration$;
+    const seeked$ = this.seeked$;
+
+    if (!video) {
+      return;
+    }
+    const canvas = context.canvas as HTMLCanvasElement;
+
+    Object.defineProperty(video, 'duration', {
+      get: () => duration$.value,
+      set: (val: number) => {
+        duration$.next(val);
+      },
+      configurable: true,
+    });
+
+    Object.defineProperty(video, 'currentTime', {
+      get: () => currentTime$.value,
+      set: (val: number) => {
+        currentTime$.next(val);
+        seeked$.next(val);
+      },
+      configurable: true,
+    });
+
+    frameRate$
+      .pipe(takeUntil(destroyRef$), distinctUntilChanged())
+      .subscribe((frameRate) =>
+        captureCanvasAsVideoSrcObject(video, canvas, frameRate)
+      );
   }
 }

@@ -3,9 +3,11 @@ import { ArkErrors, type } from 'arktype';
 
 export const AAC_CODEC_TYPE = 'AAC';
 
-export const AudioObjectTypeSchema = type('1 | 2 | 3 | 4 | 5 | 29 | 67');
+export const AudioObjectTypeSchema = type('1 | 2 | 3 | 4 | 5 | 29 | 67 | 23');
 
-export const SamplingFrequencyIndexSchema = type('1|2|3|4|5|6|7|8|9|10|11|12');
+export const SamplingFrequencyIndexSchema = type(
+  '1 | 2 | 3 | 4 |5|6|7|8|9|10|11|12'
+);
 
 export const ChannelConfigurationSchema = type('1 | 2 | 3 | 4 | 5 | 6 | 7');
 
@@ -107,4 +109,16 @@ export function genCodecIdByAudioSpecificConfig(
   config: AudioSpecificConfigType
 ) {
   return `mp4a.40.${config.audioObjectType}`;
+}
+
+export function samplesPerFrameByAACAudioObjectType(audioObjectType: number) {
+  switch (audioObjectType) {
+    case 5:
+    case 29:
+      return 2048;
+    case 23:
+      return 512;
+    default:
+      return 1024;
+  }
 }

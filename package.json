@@ -17,6 +17,7 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@types/node": "^22.13.11",
+    "@webgpu/types": "^0.1.59",
     "change-case": "^5.4.4",
     "happy-dom": "^17.4.4",
     "tsx": "^4.19.3",

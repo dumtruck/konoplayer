@@ -342,9 +342,14 @@ function generateMkvSchemaHierarchy(elements_: EbmlElementType[]) {
   const idMulti = new Set<string>();
   const preDefs = [
     'export const BinarySchema = type.instanceOf(Uint8Array);',
+    'export type BinaryType = typeof BinarySchema.infer;',
     ...Object.entries(AdHocType).map(
       ([name, meta]) =>
         `export const ${meta.primitive()} = type.instanceOf(Ebml${name}Tag);`
+    ),
+    ...Object.entries(AdHocType).map(
+      ([name, meta]) =>
+        `export type ${name}Type = typeof ${meta.primitive()}.infer;`
     ),
   ];
 

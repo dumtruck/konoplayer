@@ -2,8 +2,11 @@ import { type, match } from 'arktype';
 import { EbmlTagIdEnum, EbmlSimpleBlockTag, EbmlBlockTag } from 'konoebml';
 
 export const BinarySchema = type.instanceOf(Uint8Array);
+export type BinaryType = typeof BinarySchema.infer;
 export const SimpleBlockSchema = type.instanceOf(EbmlSimpleBlockTag);
 export const BlockSchema = type.instanceOf(EbmlBlockTag);
+export type SimpleBlockType = typeof SimpleBlockSchema.infer;
+export type BlockType = typeof BlockSchema.infer;
 
 export const DocTypeExtensionSchema = type({
   DocTypeExtensionName: type.string,

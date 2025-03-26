@@ -1,9 +1,13 @@
-import {ParseCodecError, UnsupportedCodecError} from '@konoplayer/core/errors';
+import {
+  ParseCodecError,
+  UnsupportedCodecError,
+} from '@konoplayer/core/errors';
 import { VideoCodec, AudioCodec } from '@konoplayer/core/codecs';
 import type { TrackEntryType } from '../schema';
 import {
   genCodecIdByAudioSpecificConfig,
   parseAudioSpecificConfig,
+  samplesPerFrameByAACAudioObjectType,
 } from './aac';
 import {
   genCodecStringByAVCDecoderConfigurationRecord,
@@ -19,7 +23,8 @@ import {
 } from './hevc.ts';
 import {
   genCodecStringByVP9DecoderConfigurationRecord,
-  parseVP9DecoderConfigurationRecord, VP9_CODEC_TYPE,
+  parseVP9DecoderConfigurationRecord,
+  VP9_CODEC_TYPE,
 } from './vp9.ts';
 
 export const VideoCodecId = {
@@ -123,7 +128,7 @@ export interface VideoDecoderConfigExt extends VideoDecoderConfig {
 }
 
 export function videoCodecIdRequirePeekingKeyframe(codecId: VideoCodecIdType) {
-  return codecId === VideoCodecId.VP9
+  return codecId === VideoCodecId.VP9;
 }
 
 export function videoCodecIdToWebCodecs(
@@ -146,7 +151,10 @@ export function videoCodecIdToWebCodecs(
       };
     case VideoCodecId.VP9:
       if (!keyframe) {
-        throw new ParseCodecError(VP9_CODEC_TYPE, 'keyframe is required to parse VP9 codec')
+        throw new ParseCodecError(
+          VP9_CODEC_TYPE,
+          'keyframe is required to parse VP9 codec'
+        );
       }
       return {
         ...shareOptions,
@@ -200,11 +208,10 @@ export function videoCodecIdToWebCodecs(
 
 export interface AudioDecoderConfigExt extends AudioDecoderConfig {
   codecType: AudioCodec;
+  samplesPerFrame?: number;
 }
 
-export function isAudioCodecIdRequirePeekingKeyframe (
-  _track: TrackEntryType,
-) {
+export function isAudioCodecIdRequirePeekingKeyframe(_track: TrackEntryType) {
   return false;
 }
 
@@ -231,6 +238,7 @@ export function audioCodecIdToWebCodecs(
         ...shareOptions,
         codecType: AudioCodec.AAC,
         codec: 'mp4a.40.1',
+        samplesPerFrame: 1024,
       };
     case AudioCodecId.AAC_MPEG2_LC:
     case AudioCodecId.AAC_MPEG4_LC:
@@ -238,6 +246,7 @@ export function audioCodecIdToWebCodecs(
         ...shareOptions,
         codecType: AudioCodec.AAC,
         codec: 'mp4a.40.2',
+        samplesPerFrame: 1024,
       };
     case AudioCodecId.AAC_MPEG2_SSR:
     case AudioCodecId.AAC_MPEG4_SSR:
@@ -245,12 +254,14 @@ export function audioCodecIdToWebCodecs(
         ...shareOptions,
         codecType: AudioCodec.AAC,
         codec: 'mp4a.40.3',
+        samplesPerFrame: 1024,
       };
     case AudioCodecId.AAC_MPEG4_LTP:
       return {
         ...shareOptions,
         codecType: AudioCodec.AAC,
         codec: 'mp4a.40.4',
+        samplesPerFrame: 1024,
       };
     case AudioCodecId.AAC_MPEG2_LC_SBR:
     case AudioCodecId.AAC_MPEG4_SBR:
@@ -258,16 +269,25 @@ export function audioCodecIdToWebCodecs(
         ...shareOptions,
         codecType: AudioCodec.AAC,
         codec: 'mp4a.40.5',
+        samplesPerFrame: 2048,
       };
     case AudioCodecId.AAC:
+      if (codecPrivate) {
+        const config = parseAudioSpecificConfig(codecPrivate);
+        return {
+          ...shareOptions,
+          codecType: AudioCodec.AAC,
+          codec: genCodecIdByAudioSpecificConfig(config),
+          samplesPerFrame: samplesPerFrameByAACAudioObjectType(
+            config.audioObjectType
+          ),
+        };
+      }
       return {
         ...shareOptions,
         codecType: AudioCodec.AAC,
-        codec: codecPrivate
-          ? genCodecIdByAudioSpecificConfig(
-              parseAudioSpecificConfig(codecPrivate)
-            )
-          : 'mp4a.40.2',
+        codec: 'mp4a.40.2',
+        samplesPerFrame: 1024,
       };
     case AudioCodecId.AC3:
     case AudioCodecId.AC3_BSID9:
@@ -275,6 +295,7 @@ export function audioCodecIdToWebCodecs(
         ...shareOptions,
         codecType: AudioCodec.AC3,
         codec: 'ac-3',
+        samplesPerFrame: 1536,
       };
     case AudioCodecId.EAC3:
     case AudioCodecId.AC3_BSID10:
@@ -282,21 +303,75 @@ export function audioCodecIdToWebCodecs(
         ...shareOptions,
         codecType: AudioCodec.EAC3,
         codec: 'ec-3',
+        // TODO: FIXME
+        // parse frame header
+        // samples per frame = numblkscod * 256
+        // most time numblkscod = 6
+        // samplesPerFrame: 1536,
       };
     case AudioCodecId.MPEG_L3:
       return {
         ...shareOptions,
         codecType: AudioCodec.MP3,
         codec: 'mp3',
+        samplesPerFrame: 1152,
       };
     case AudioCodecId.VORBIS:
-      return { ...shareOptions, codecType: AudioCodec.Vorbis, codec: 'vorbis' };
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.Vorbis,
+        codec: 'vorbis',
+        /**
+         * TODO: FIXME
+         * read code private
+         * prase setup header
+         * ShortBlockSize = 2 ^ blocksize_0
+         * LongBlockSize = 2 ^ blocksize_1
+         */
+        samplesPerFrame: 2048,
+      };
     case AudioCodecId.FLAC:
-      return { ...shareOptions, codecType: AudioCodec.FLAC, codec: 'flac' };
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.FLAC,
+        codec: 'flac',
+        /**
+         * TODO: FIXME
+         * read code private
+         * get block size
+         */
+        // samplesPerFrame: 4096,
+      };
     case AudioCodecId.OPUS:
-      return { ...shareOptions, codecType: AudioCodec.Opus, codec: 'opus' };
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.Opus,
+        codec: 'opus',
+        /**
+         * TODO: FIXME
+         * Read TOC header from frame data
+         */
+        // samplesPerFrame: 960,
+      };
     case AudioCodecId.ALAC:
-      return { ...shareOptions, codecType: AudioCodec.ALAC, codec: 'alac' };
+      return {
+        ...shareOptions,
+        codecType: AudioCodec.ALAC,
+        codec: 'alac',
+        /**
+         * TODO: FIXME
+         * parse private data and get frame length
+         * 00 00 10 00  // Frame Length (4096)
+          00 00 00 00  // Compatible Version (0)
+          00 10        // Bit Depth (16-bit)
+          40 00        // PB (like 40)
+          00 00        // MB (like 0)
+          00 00        // KB (like 0)
+          00 02        // Channels (2)
+          00 00 AC 44  // Sample Rate (44100Hz)
+         */
+        // samplesPerFrame: 4096,
+      };
     case AudioCodecId.PCM_INT_BIG:
       if (bitDepth === 16) {
         return {

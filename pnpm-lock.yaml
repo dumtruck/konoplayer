@@ -36,6 +36,9 @@ importers:
       '@types/node':
         specifier: ^22.13.11
         version: 22.13.11
+      '@webgpu/types':
+        specifier: ^0.1.59
+        version: 0.1.59
       change-case:
         specifier: ^5.4.4
         version: 5.4.4
@@ -1150,6 +1153,9 @@ packages:
 
   '@webassemblyjs/wast-printer@1.14.1':
     resolution: {integrity: sha512-kPSSXE6De1XOR820C90RIo2ogvZG+c3KiHzqUoO/F34Y2shGzesfqv7o57xrxovZJH/MetF5UjroJ/R/3isoiw==}
+
+  '@webgpu/types@0.1.59':
+    resolution: {integrity: sha512-jZJ6ipNli+rn++/GAPqsZXfsgjx951wlCW7vNAg+oGdp0ZYidTOkbVTVeK2frzowuD5ch7MRz7leOEX1PMv43A==}
 
   '@xhmikosr/archive-type@7.0.0':
     resolution: {integrity: sha512-sIm84ZneCOJuiy3PpWR5bxkx3HaNt1pqaN+vncUBZIlPZCq8ASZH+hBVdu5H8znR7qYC6sKwx+ie2Q7qztJTxA==}
@@ -4014,6 +4020,8 @@ snapshots:
     dependencies:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
+
+  '@webgpu/types@0.1.59': {}
 
   '@xhmikosr/archive-type@7.0.0':
     dependencies:
