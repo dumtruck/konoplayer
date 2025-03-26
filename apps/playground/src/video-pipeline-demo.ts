@@ -13,7 +13,10 @@ import {
   fromEvent,
   share,
   takeUntil,
-  firstValueFrom, tap, throwIfEmpty, ReplaySubject, finalize, of, interval,
+  firstValueFrom,
+  tap,
+  throwIfEmpty,
+  ReplaySubject,
 } from 'rxjs';
 import { createMatroska } from '@konoplayer/matroska/model';
 import { createRef, ref, type Ref } from 'lit/directives/ref.js';
@@ -78,35 +81,47 @@ export class VideoPipelineDemo extends LitElement {
         videoTrackDecoder,
         audioTrackDecoder,
       },
-      totalSize
+      totalSize,
     } = await firstValueFrom(
       createMatroska({
         url: src,
-      }).pipe(
-        throwIfEmpty(() => new Error("failed to extract matroska"))
-      )
-    )
+      }).pipe(throwIfEmpty(() => new Error('failed to extract matroska')))
+    );
 
-    console.debug(`[MATROSKA]: loaded metadata, total size ${totalSize} bytes`)
+    console.debug(`[MATROSKA]: loaded metadata, total size ${totalSize} bytes`);
 
     const currentCluster$ = this.seeked$.pipe(
       switchMap((seekTime) => seek(seekTime)),
-      share({ resetOnRefCountZero: false, resetOnError: false, resetOnComplete: false }),
+      share({
+        resetOnRefCountZero: false,
+        resetOnError: false,
+        resetOnComplete: false,
+      })
     );
 
     defaultVideoTrack$
-      .pipe(take(1), takeUntil(destroyRef$), tap((track) => console.debug('[MATROSKA]: video track loaded,', track)))
+      .pipe(
+        take(1),
+        takeUntil(destroyRef$),
+        tap((track) => console.debug('[MATROSKA]: video track loaded,', track))
+      )
       .subscribe(this.videoTrack$.next.bind(this.videoTrack$));
 
     defaultAudioTrack$
-      .pipe(take(1), takeUntil(destroyRef$), tap((track) => console.debug('[MATROSKA]: audio track loaded,', track)))
+      .pipe(
+        take(1),
+        takeUntil(destroyRef$),
+        tap((track) => console.debug('[MATROSKA]: audio track loaded,', track))
+      )
       .subscribe(this.audioTrack$.next.bind(this.audioTrack$));
 
     this.videoTrack$
       .pipe(
         takeUntil(this.destroyRef$),
         switchMap((track) =>
-          track?.configuration ? videoTrackDecoder(track, currentCluster$) : EMPTY
+          track?.configuration
+            ? videoTrackDecoder(track, currentCluster$)
+            : EMPTY
         ),
         switchMap(({ frame$ }) => frame$)
       )
@@ -120,7 +135,9 @@ export class VideoPipelineDemo extends LitElement {
       .pipe(
         takeUntil(this.destroyRef$),
         switchMap((track) =>
-          track?.configuration ? audioTrackDecoder(track, currentCluster$) : EMPTY
+          track?.configuration
+            ? audioTrackDecoder(track, currentCluster$)
+            : EMPTY
         ),
         switchMap(({ frame$ }) => frame$)
       )
@@ -144,22 +161,25 @@ export class VideoPipelineDemo extends LitElement {
       ),
     }).pipe(
       takeUntil(this.destroyRef$),
-      map(({ ended, paused, videoBuffered, audioBuffered }) => !paused && !ended && !!(videoBuffered || audioBuffered)),
+      map(
+        ({ ended, paused, videoBuffered, audioBuffered }) =>
+          !paused && !ended && !!(videoBuffered || audioBuffered)
+      ),
       tap((enabled) => {
         if (enabled) {
-          playableStartTime = performance.now()
+          playableStartTime = performance.now();
         }
       }),
       share()
-    )
+    );
 
     let nextAudioStartTime = 0;
     playable
       .pipe(
         tap(() => {
-          nextAudioStartTime = 0
+          nextAudioStartTime = 0;
         }),
-        switchMap((enabled) => (enabled ? animationFrames() : EMPTY)),
+        switchMap((enabled) => (enabled ? animationFrames() : EMPTY))
       )
       .subscribe(() => {
         const audioFrameBuffer = this.audioFrameBuffer$.getValue();
@@ -169,7 +189,7 @@ export class VideoPipelineDemo extends LitElement {
         let audioChanged = false;
         while (audioFrameBuffer.size > 0) {
           const firstAudio = audioFrameBuffer.peek();
-          if (firstAudio && (firstAudio.timestamp / 1000) <= accTime) {
+          if (firstAudio && firstAudio.timestamp / 1000 <= accTime) {
             const audioFrame = audioFrameBuffer.dequeue()!;
             audioChanged = true;
             if (audioContext) {
@@ -187,10 +207,14 @@ export class VideoPipelineDemo extends LitElement {
               const fadeLength = Math.min(50, audioFrame.numberOfFrames);
               for (let channel = 0; channel < numberOfChannels; channel++) {
                 const channelData = new Float32Array(numberOfFrames);
-                audioFrame.copyTo(channelData, { planeIndex: channel, frameCount: numberOfFrames });
+                audioFrame.copyTo(channelData, {
+                  planeIndex: channel,
+                  frameCount: numberOfFrames,
+                });
                 for (let i = 0; i < fadeLength; i++) {
                   channelData[i] *= i / fadeLength; // fade-in
-                  channelData[audioFrame.numberOfFrames - 1 - i] *= i / fadeLength; // fade-out
+                  channelData[audioFrame.numberOfFrames - 1 - i] *=
+                    i / fadeLength; // fade-out
                 }
                 audioBuffer.copyToChannel(channelData, channel);
               }
@@ -222,9 +246,7 @@ export class VideoPipelineDemo extends LitElement {
       });
 
     playable
-      .pipe(
-        switchMap((enabled) => (enabled ? animationFrames() : EMPTY)),
-      )
+      .pipe(switchMap((enabled) => (enabled ? animationFrames() : EMPTY)))
       .subscribe(async () => {
         const renderingContext = this.renderingContext;
         const videoFrameBuffer = this.videoFrameBuffer$.getValue();
@@ -233,7 +255,7 @@ export class VideoPipelineDemo extends LitElement {
         const accTime = nowTime - playableStartTime;
         while (videoFrameBuffer.size > 0) {
           const firstVideo = videoFrameBuffer.peek();
-          if (firstVideo && (firstVideo.timestamp / 1000) <= accTime) {
+          if (firstVideo && firstVideo.timestamp / 1000 <= accTime) {
             const videoFrame = videoFrameBuffer.dequeue()!;
             videoChanged = true;
             if (renderingContext) {
@@ -252,12 +274,30 @@ export class VideoPipelineDemo extends LitElement {
 
     fromEvent(document.body, 'click')
       .pipe(takeUntil(this.destroyRef$))
-      .subscribe(() => {
+      .subscribe(async () => {
+        const permissionStatus = await navigator.permissions.query({
+          name: 'microphone',
+        });
+        if (permissionStatus.state === 'prompt') {
+          await navigator.mediaDevices.getUserMedia({
+            audio: true,
+          });
+        }
         this.audioContext.resume();
         this.audioFrameBuffer$.next(this.audioFrameBuffer$.getValue());
       });
 
-    this.seeked$.next(0)
+    const permissionStatus = await navigator.permissions.query({
+      name: 'microphone',
+    });
+    if (permissionStatus.state === 'granted') {
+      await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+      this.audioContext.resume();
+    }
+
+    this.seeked$.next(0);
   }
 
   async connectedCallback() {
