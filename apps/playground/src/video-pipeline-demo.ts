@@ -208,6 +208,7 @@ export class VideoPipelineDemo extends LitElement {
               for (let channel = 0; channel < numberOfChannels; channel++) {
                 const channelData = new Float32Array(numberOfFrames);
                 audioFrame.copyTo(channelData, {
+                  format: 'f32-planar',
                   planeIndex: channel,
                   frameCount: numberOfFrames,
                 });
